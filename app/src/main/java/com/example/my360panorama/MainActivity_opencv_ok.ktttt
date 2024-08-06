@@ -1,0 +1,80 @@
+package com.example.my360panorama
+
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.appcompat.app.AppCompatActivity
+import android.os.Bundle
+import android.view.View
+import android.widget.ImageView
+import android.widget.SeekBar
+import com.example.my360panorama.databinding.ActivityMainBinding
+import kotlin.math.max
+import android.opengl.GLSurfaceView
+
+
+
+class MainActivity : AppCompatActivity(), SeekBar.OnSeekBarChangeListener {
+    var srcBitmap: Bitmap? = null
+    var dstBitmap: Bitmap? = null
+
+    private lateinit var sldSigma: SeekBar
+
+    private lateinit var binding: ActivityMainBinding
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        srcBitmap = BitmapFactory.decodeResource(this.resources, R.drawable.pano)
+
+        // Create and display dstBitmap in image view, we will keep updating
+        // dstBitmap and the changes will be displayed on screen
+        dstBitmap = srcBitmap!!.copy(srcBitmap!!.config, true)
+        val imageView = findViewById<ImageView>(R.id.imageView)
+        imageView.setImageBitmap(dstBitmap)
+
+        sldSigma = findViewById<SeekBar>(R.id.seekBar)
+        sldSigma.setOnSeekBarChangeListener(this)
+
+        //binding = ActivityMainBinding.inflate(layoutInflater)
+        //setContentView(binding.root)
+
+        // Example of a call to a native method
+        //binding.sampleText.text = stringFromJNI()
+    }
+
+    fun btnFlip_click(view: View) {
+        this.flip(srcBitmap!!, dstBitmap!!)
+    }
+
+    fun doBlur() {
+        // The SeekBar range is 0-100 convert it to 0.1-10
+        val sigma = max(0.1F, sldSigma.progress / 10F)
+
+        // This is the actual call to the blur method inside native-lib.cpp
+        this.blur(srcBitmap!!, dstBitmap!!, sigma)
+    }
+
+    override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+        this.doBlur()
+    }
+
+    override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+
+    override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+
+    /**
+     * A native method that is implemented by the 'my360panorama' native library,
+     * which is packaged with this application.
+     */
+    external fun stringFromJNI(): String
+    external fun blur(bitmapIn: Bitmap, bitmapOut: Bitmap, sigma: Float)
+    external fun flip(bitmapIn: Bitmap, bitmapOut: Bitmap)
+
+    companion object {
+        // Used to load the 'my360panorama' library on application startup.
+        init {
+            System.loadLibrary("my360panorama")
+        }
+    }
+}
