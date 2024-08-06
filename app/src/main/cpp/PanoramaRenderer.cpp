@@ -1,19 +1,4 @@
 #include "PanoramaRenderer.h"
-#include <android/asset_manager.h>
-#include <android/asset_manager_jni.h>
-#include <android/log.h>
-
-#include <jni.h>
-//#include <unistd.h> // pwd 使用，不用可注释掉
-#include<iostream>
-#include<string>
-#include <utility>
-
-#define STB_IMAGE_IMPLEMENTATION
-#include "stb_image.h"
-#include "glm/glm.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include "glm/gtc/type_ptr.hpp"
 
 #define LOG_TAG "PanoramaRenderer"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -21,12 +6,16 @@
 
 PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filepath)
     : shaderProgram(0), texture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
-    sphereData(new SphereData(1.0f, 32, 32)), assetManager(assetManager),
-    sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) {
-    //sharePath = std::move(filepath);
+    sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
+    sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
+    stopVideo(false),videoTexture(0){
 }
 
 PanoramaRenderer::~PanoramaRenderer() {
+    stopVideo = true;
+    if (videoThread.joinable()){
+        videoThread.join();
+    }
     delete sphereData;
     glDeleteProgram(shaderProgram);
     glDeleteTextures(1, &texture);
@@ -99,6 +88,7 @@ GLuint PanoramaRenderer::createProgram(const char *vertexSrc, const char *fragme
     return program;
 }
 
+
 GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
     AAsset *asset = AAssetManager_open(assetManager, assetPath, AASSET_MODE_STREAMING);
     if (!asset) {
@@ -128,20 +118,8 @@ GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
     cv::flip(img, img, 0);
     width = img.cols;
     height  = img.rows;
-    //nrChannels = img.channels();
-    //char cwd[1024];
-    //std::string currPath;
-    //if (getcwd(cwd, sizeof(cwd)) != nullptr)
-        //__android_log_print(ANDROID_LOG_INFO, "", cwd);
-        //currPath = std::string(cwd);
-    bool issave = cv::imwrite(sharePath+"/AAA.jpg",img);
-    LOGE("IS save:%d\n",issave);
-
-    //stbi_uc *data = stbi_load_from_memory(fileData.data(), fileData.size(), &width, &height, &nrChannels, 0);
-    //if (!data) {
-    //    LOGE("Failed to load texture image from asset");
-    //    return 0;
-    //}
+//    bool issave = cv::imwrite(sharePath+"/AAA.jpg",img);
+//    LOGE("IS save:%d\n",issave);
 
     GLuint texture;
     glGenTextures(1, &texture);
@@ -155,9 +133,10 @@ GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-    //stbi_image_free(data);
     return texture;
 }
+
+
 
 void PanoramaRenderer::onSurfaceCreated() {
     const char *vertexShaderSource =
@@ -210,16 +189,54 @@ void PanoramaRenderer::onSurfaceCreated() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboIndices);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphereData->getNumIndices() * sizeof(GLushort), sphereData->getIndices(), GL_STATIC_DRAW);
 
-    texture = loadTexture("360panorama.jpg");
-    if (!texture) {
-        LOGE("Failed to load texture");
+    ////////////////// 360全景图像////////////////////////////////////////////
+    // texture = loadTexture("360panorama.jpg");
+    // if (!texture) {
+    //     LOGE("Failed to load texture");
+    //     return;
+    // }
+    // glBindBuffer(GL_ARRAY_BUFFER, 0);// 解绑 VBO,360全景图像最好需要
+    // glBindVertexArray(0); // 解绑VAO,360全景图像最好需要
+    // glEnable(GL_DEPTH_TEST);//360全景图像最好需要
+    //////////////////end of 360全景图像////////////////////////////////////////////
+
+    ////////////// 360全景视频，Initialize video decoding resources///////////////////
+
+    videoCapture.open(sharePath+"/111.mp4");
+    LOGE("sharePath:%s\n",(sharePath+"/111.mp4").c_str());
+    if (!videoCapture.isOpened()) {
+        LOGE("Could not open video file: %s", sharePath.c_str());
         return;
     }
+    int frameWidth = static_cast<int>(videoCapture.get(cv::CAP_PROP_FRAME_WIDTH));
+    int frameHeight = static_cast<int>(videoCapture.get(cv::CAP_PROP_FRAME_HEIGHT));
 
-    glBindBuffer(GL_ARRAY_BUFFER, 0);// 解绑 VBO
-    glBindVertexArray(0); // 解绑VAO
+    glGenTextures(1, &videoTexture);
+    glBindTexture(GL_TEXTURE_2D, videoTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight,
+                 0, GL_RGB, GL_UNSIGNED_BYTE,nullptr);
+    //glGenerateMipmap(GL_TEXTURE_2D); //视频渲染不使用 glGenerateMipmap,较少性能开销
 
-    glEnable(GL_DEPTH_TEST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    videoThread = std::thread(&PanoramaRenderer::videoDecodingLoop, this);
+    ///////////////////////////////end of 360全景视频/////////////////////////////////
+}
+
+void PanoramaRenderer::videoDecodingLoop(){
+    while (!stopVideo) {
+        cv::Mat tempFrame;
+        if (!videoCapture.read(tempFrame)) {
+            LOGE("Failed to read frame from video");
+            break;
+        }
+        cv::flip(tempFrame,frame,0);
+//        cv::cvtColor(tempFrame, tempFrame, cv::COLOR_BGR2RGB);
+        std::this_thread::sleep_for(std::chrono::milliseconds(30)); // Adjust frame rate if needed
+    }
 }
 
 void PanoramaRenderer::onDrawFrame() {
@@ -232,13 +249,7 @@ void PanoramaRenderer::onDrawFrame() {
     // 计算相机的位置，假设以 (0, 0, 0) 为中心点，围绕Y轴和X轴旋转
     // 使用球面坐标来实现环绕效果
 //    float radius = 5.0f; // 距离，从球心到相机的距离
-//
-//    // 计算相机位置
-//    float x = radius * sin(glm::radians(rotationY)) * cos(glm::radians(rotationX));
-//    float y = radius * sin(glm::radians(rotationX));
-//    float z = radius * cos(glm::radians(rotationY)) * cos(glm::radians(rotationX));
-
-    view = glm::lookAt(glm::vec3(0.0f,0.0f,0.0f) , glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    view = glm::lookAt(glm::vec3(0.0f,0.0f,0.0f)*zoom , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     view = glm::rotate(view, glm::radians(rotationX), glm::vec3(1.0f, 0.0f, 0.0f));
     view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -249,8 +260,15 @@ void PanoramaRenderer::onDrawFrame() {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
     glBindVertexArray(vao);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    {
+        std::lock_guard<std::mutex> lock(textureMutex);
+        if (!frame.empty()) {
+            glBindTexture(GL_TEXTURE_2D, videoTexture);
+            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+        }
+    }
+//    glActiveTexture(GL_TEXTURE0);
+//    glBindTexture(GL_TEXTURE_2D, texture);
     glDrawElements(GL_TRIANGLES, sphereData->getNumIndices(), GL_UNSIGNED_SHORT, 0);
     glBindVertexArray(0);// 解绑 VAO
 }

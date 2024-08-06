@@ -22,6 +22,17 @@ find_library(jnigraphics-lib jnigraphics)
 #find_library(log-lib log)
 #find_library(android-lib android)
 
+## ffmpeg 解码
+## Find FFmpeg package
+#find_package(PkgConfig REQUIRED)
+#pkg_check_modules(AVFORMAT REQUIRED libavformat)
+#pkg_check_modules(AVCODEC REQUIRED libavcodec)
+#pkg_check_modules(AVUTIL REQUIRED libavutil)
+#pkg_check_modules(SWSCALE REQUIRED libswscale)
+## Include FFmpeg headers
+#include_directories(${AVFORMAT_INCLUDE_DIRS} ${AVCODEC_INCLUDE_DIRS} ${AVUTIL_INCLUDE_DIRS} ${SWSCALE_INCLUDE_DIRS})
+
+
 # Creates and names a library, sets it as either STATIC
 # or SHARED, and provides the relative paths to its source code.
 # You can define multiple libraries, and CMake builds them for you.

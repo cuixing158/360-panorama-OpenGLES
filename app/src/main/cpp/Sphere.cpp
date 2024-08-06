@@ -21,9 +21,9 @@ SphereData::SphereData(float radius, unsigned int rings, unsigned int sectors) {
             float x = cos(2 * M_PI * s * S) * sin(M_PI * r * R);
             float z = sin(2 * M_PI * s * S) * sin(M_PI * r * R);
 
-            //float z = sin(-M_PI_2 + M_PI * r * R);
-            //float y = cos(-M_PI_2 + M_PI * r * R)*sin(2 * M_PI * s * S) ;
-            //float x = cos(-M_PI_2 + M_PI * r * R)*cos(2 * M_PI * s * S);
+//            float z = sin(-M_PI_2 + M_PI * r * R);
+//            float y = cos(-M_PI_2 + M_PI * r * R)*sin(2 * M_PI * s * S) ;
+//            float x = cos(-M_PI_2 + M_PI * r * R)*cos(2 * M_PI * s * S);
 
             texCoords[t++] = s * S;
             texCoords[t++] = r * R;
