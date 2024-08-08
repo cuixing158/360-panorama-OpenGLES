@@ -14,27 +14,58 @@ project("my360panorama")
 
 # 参考：https://blog.csdn.net/qq_37857689/article/details/126548915
 set(OpenCV_STATIC ON)
-set(OpenCV_DIR "E:/softwares/opencv-4.10.0-android-sdk/OpenCV-android-sdk/sdk/native/jni")
-find_package(OpenCV REQUIRED)
+#set(OpenCV_DIR "E:/softwares/opencv-4.10.0-android-sdk/OpenCV-android-sdk/sdk/native/jni")
+#find_package(OpenCV REQUIRED)
 
 # jnigraphics lib from NDK is used for Bitmap manipulation in native code
 find_library(jnigraphics-lib jnigraphics)
-#find_library(log-lib log)
-#find_library(android-lib android)
+find_library(log-lib log)
+find_library(android-lib android)
+
+
+#include_directories("E:/androidStudio_works/my360panorama/opencv/native/jni/include")
 
 ## ffmpeg prebuilt libraries
-set(FFMPEG_DIR "E:/softwares/ffmpeg-n5.1-latest-linuxarm64-gpl-shared-5.1")
-add_library(avcodec SHARED IMPORTED)
-set_target_properties(avcodec PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavcodec.so)
+include_directories(${CMAKE_SOURCE_DIR}/include)
+set(SRC_FFMPEG
+        ffmpeg_cmd.c
+        ffmpeg/cmdutils.c
+        ffmpeg/ffmpeg.c
+        ffmpeg/ffmpeg_demux.c
+        ffmpeg/ffmpeg_filter.c
+        ffmpeg/ffmpeg_hw.c
+        ffmpeg/ffmpeg_mux.c
+        ffmpeg/ffmpeg_mux_init.c
+        ffmpeg/ffmpeg_opt.c
+        ffmpeg/ffprobe.c
+        ffmpeg/objpool.c
+        ffmpeg/opt_common.c
+        ffmpeg/sync_queue.c
+        ffmpeg/thread_queue.c)
 
-add_library(avformat SHARED IMPORTED)
-set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavformat.so)
+add_library(ffmpeg
+        SHARED
+        IMPORTED)
+set_target_properties(ffmpeg
+        PROPERTIES IMPORTED_LOCATION
+        ../../../../libs/${CMAKE_ANDROID_ARCH_ABI}/libffmpeg.so)
 
-add_library(avutil SHARED IMPORTED)
-set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavutil.so)
+if (${CMAKE_ANDROID_ARCH_ABI} MATCHES "armeabi-v7a")
+    include_directories(include/armeabi-v7a/libavcodec)
+    include_directories(include/armeabi-v7a/libavutil)
+    message("This is armeabi-v7a")
+elseif (${CMAKE_ANDROID_ARCH_ABI} MATCHES "arm64-v8a")
+    include_directories(include/arm64-v8a/libavcodec)
+    include_directories(include/arm64-v8a/libavutil)
+    message("This is arm64-v8a")
+endif ()
 
-include_directories(${FFMPEG_DIR}/include)
-
+add_library(opencv
+        SHARED
+        IMPORTED)
+set_target_properties(opencv
+        PROPERTIES IMPORTED_LOCATION
+        ../../../../libs/${CMAKE_ANDROID_ARCH_ABI}/libopencv_java4.so)
 
 
 # Creates and names a library, sets it as either STATIC
@@ -52,18 +83,18 @@ include_directories(${FFMPEG_DIR}/include)
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-          stb_image.h
+        stb_image.h
         PanoramaRenderer.cpp Sphere.cpp)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}
-        ${OpenCV_INCLUDE_DIRS})
+        ${CMAKE_CURRENT_SOURCE_DIR})
+
 
 # Specifies libraries CMake should link to your target library. You
 # can link libraries from various origins, such as libraries defined in this
 # build script, prebuilt third-party libraries, or Android system libraries.
 target_link_libraries(${CMAKE_PROJECT_NAME}
-        ${OpenCV_LIBS}
+        #${OpenCV_LIBS}
         ${jnigraphics-lib}
         EGL
         GLESv3
@@ -71,6 +102,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         android
         log
         # ffmpeg libraries
-        avcodec
-        avformat
-        avutil)
+        ffmpeg
+        opencv
+)
