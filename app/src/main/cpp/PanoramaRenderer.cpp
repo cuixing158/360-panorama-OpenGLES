@@ -1,13 +1,12 @@
 #include "PanoramaRenderer.h"
 
-#define LOG_TAG "PanoramaRenderer"
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
-#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+
 
 PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filepath)
     : shaderProgram(0), texture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
+    widthScreen(800),heightScreen(800),
     stopVideo(false),videoTexture(0){
 }
 
@@ -202,8 +201,8 @@ void PanoramaRenderer::onSurfaceCreated() {
 
     ////////////// 360全景视频，Initialize video decoding resources///////////////////
 
-    videoCapture.open(sharePath+"/111.mp4");
-    LOGE("sharePath:%s\n",(sharePath+"/111.mp4").c_str());
+    videoCapture.open(sharePath+"/360panorama.mp4");
+    //LOGE("sharePath:%s\n",(sharePath+"/111.mp4").c_str());
     if (!videoCapture.isOpened()) {
         LOGE("Could not open video file: %s", sharePath.c_str());
         return;
@@ -244,13 +243,14 @@ void PanoramaRenderer::onDrawFrame() {
 
     glUseProgram(shaderProgram);
 
-    projection = glm::perspective(glm::radians(55.0f), (float)800 / (float)800, 0.1f, 100.0f);
+    projection = glm::perspective(glm::radians(55.0f), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
+    LOGE("图像width:%d,height:%d\n",widthScreen,heightScreen);
     // 小行星
     // 计算相机的位置，假设以 (0, 0, 0) 为中心点，围绕Y轴和X轴旋转
     // 使用球面坐标来实现环绕效果
 //    float radius = 5.0f; // 距离，从球心到相机的距离
     view = glm::lookAt(glm::vec3(0.0f,0.0f,0.0f)*zoom , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-    view = glm::rotate(view, glm::radians(rotationX), glm::vec3(1.0f, 0.0f, 0.0f));
+    view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 0.0f, 1.0f));
     view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
@@ -274,8 +274,10 @@ void PanoramaRenderer::onDrawFrame() {
 }
 
 void PanoramaRenderer::onSurfaceChanged(int width, int height) {
-    GLsizei len = std::min({width,height});
-    glViewport(0, 0, len,len);
+//    GLsizei len = std::min({width,height});
+    widthScreen = width;
+    heightScreen = height;
+    glViewport(0, 0, width,height);
 }
 
 void PanoramaRenderer::handleTouchDrag(float deltaX, float deltaY) {

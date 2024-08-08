@@ -22,15 +22,19 @@ find_library(jnigraphics-lib jnigraphics)
 #find_library(log-lib log)
 #find_library(android-lib android)
 
-## ffmpeg 解码
-## Find FFmpeg package
-#find_package(PkgConfig REQUIRED)
-#pkg_check_modules(AVFORMAT REQUIRED libavformat)
-#pkg_check_modules(AVCODEC REQUIRED libavcodec)
-#pkg_check_modules(AVUTIL REQUIRED libavutil)
-#pkg_check_modules(SWSCALE REQUIRED libswscale)
-## Include FFmpeg headers
-#include_directories(${AVFORMAT_INCLUDE_DIRS} ${AVCODEC_INCLUDE_DIRS} ${AVUTIL_INCLUDE_DIRS} ${SWSCALE_INCLUDE_DIRS})
+## ffmpeg prebuilt libraries
+set(FFMPEG_DIR "E:/softwares/ffmpeg-n5.1-latest-linuxarm64-gpl-shared-5.1")
+add_library(avcodec SHARED IMPORTED)
+set_target_properties(avcodec PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavcodec.so)
+
+add_library(avformat SHARED IMPORTED)
+set_target_properties(avformat PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavformat.so)
+
+add_library(avutil SHARED IMPORTED)
+set_target_properties(avutil PROPERTIES IMPORTED_LOCATION ${FFMPEG_DIR}/lib/libavutil.so)
+
+include_directories(${FFMPEG_DIR}/include)
+
 
 
 # Creates and names a library, sets it as either STATIC
@@ -65,4 +69,8 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         GLESv3
         # List libraries link to the target library
         android
-        log)
+        log
+        # ffmpeg libraries
+        avcodec
+        avformat
+        avutil)

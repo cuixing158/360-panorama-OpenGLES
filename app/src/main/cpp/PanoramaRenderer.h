@@ -10,12 +10,22 @@
 #include <atomic>
 #include <mutex>
 
+// 安卓& log
+#ifdef __ANDROID__
 // android
 #include <android/asset_manager.h>
 #include <android/asset_manager_jni.h>
 #include <android/log.h>
-
 #include <jni.h>
+#define LOG_TAG "PanoramaRenderer"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
+#else
+#include <stdio.h>
+#define LOGE(FORMAT, ...) printf(FORMAT, ##__VA_ARGS__)
+#endif
+
+// C++
 #include<iostream>
 #include<string>
 #include <utility>
@@ -59,6 +69,10 @@ private:
     float rotationX;
     float rotationY;
     float zoom;
+
+    // 屏幕宽和高尺寸
+    int widthScreen;
+    int heightScreen;
 
     //视频解码(opencv 支持)
     std::thread videoThread;
