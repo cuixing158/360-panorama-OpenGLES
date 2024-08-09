@@ -80,7 +80,10 @@ class MainActivity : AppCompatActivity() {
         var nativeRendererPtr: Long
 
         init {
-            nativeRendererPtr = nativeCreateRenderer(assetManager,path)
+            nativeRendererPtr = nativeCreateRenderer(assetManager, path)
+            if (nativeRendererPtr == 0L) {
+                throw RuntimeException("Failed to create native renderer")
+            }
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {

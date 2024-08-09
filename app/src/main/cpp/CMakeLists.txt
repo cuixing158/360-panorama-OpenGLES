@@ -21,6 +21,8 @@ set(OpenCV_STATIC ON)
 find_library(jnigraphics-lib jnigraphics)
 find_library(log-lib log)
 find_library(android-lib android)
+# 查找 OpenSL ES 库
+find_library(OpenSLES_LIB OpenSLES)
 
 
 #include_directories("E:/androidStudio_works/my360panorama/opencv/native/jni/include")
@@ -104,4 +106,6 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         # ffmpeg libraries
         ffmpeg
         opencv
+        # android
+        ${OpenSLES_LIB}
 )
