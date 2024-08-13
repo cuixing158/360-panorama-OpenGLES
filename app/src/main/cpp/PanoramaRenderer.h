@@ -15,6 +15,7 @@ extern "C" {
 #include <libavutil/imgutils.h>
 #include <libswscale/swscale.h>
 #include <libavutil/channel_layout.h>
+#include <libavutil/time.h>
 }
 
 // 全景视频，多线程处理
@@ -52,6 +53,27 @@ extern "C" {
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
+//class AudioBuffer {
+//public:
+//    void push(const std::vector<uint8_t>& data) {
+//        std::lock_guard<std::mutex> lock(mutex_);
+//        buffer.insert(buffer.end(), data.begin(), data.end());
+//    }
+//
+//    bool pop(std::vector<uint8_t>& data, size_t size) {
+//        std::lock_guard<std::mutex> lock(mutex_);
+//        if (buffer.size() < size) return false;
+//
+//        data.assign(buffer.begin(), buffer.begin() + size);
+//        buffer.erase(buffer.begin(), buffer.begin() + size);
+//        return true;
+//    }
+//
+//private:
+//    std::vector<uint8_t> buffer;
+//    std::mutex mutex_;
+//};
+
 class PanoramaRenderer {
 public:
     PanoramaRenderer(AAssetManager* assetManager,std::string filepath);
@@ -87,7 +109,9 @@ private:
     int frameWidth,frameHeight; //全景视频帧的宽和高
     GLuint videoTexture; // 全景视频帧纹理
     std::condition_variable frameReadyCondition;
-    bool frameReady;
+    cv::VideoCapture videoCapture; // 使用OpenCV解码
+    bool frameReady; // 是否准备好帧，即解码帧
+    double currentVideoPts; // 音视频同步变量
     std::mutex textureMutex; // 纹理线程锁
     AAssetManager* assetManager;
     std::string sharePath; // 共享文件夹，具有读写权限, JNI传入
@@ -120,8 +144,10 @@ private:
     SLPlayItf playerPlay;
     SLAndroidSimpleBufferQueueItf bufferQueue;
     std::condition_variable audioCondVar;
+    bool audioBufferReady;
     std::mutex audioMutex;
     uint8_t* audioBuffer;
+    //AudioBuffer* audioBuffer;
     size_t audioBufferSize;
 };
 

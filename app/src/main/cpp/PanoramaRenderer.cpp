@@ -9,14 +9,15 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     audioCodecCtx(nullptr), swrCtx(nullptr), stopPlayback(false),
     videoStreamIndex(-1), audioStreamIndex(-1),
     engineObject(nullptr), engineEngine(nullptr),
-    outputMixObject(nullptr), playerObject(nullptr),
+    outputMixObject(nullptr), playerObject(nullptr),audioBufferReady(false),
     playerPlay(nullptr), bufferQueue(nullptr), audioBuffer(nullptr),
     audioBufferSize(0){
 
     avformat_network_init();
 
     // Open the input file
-    std::string mp4File = sharePath+"/360panorama.mp4";
+    std::string mp4File = sharePath+"/360panodemo.mp4";
+    videoCapture.open(mp4File);
     if (avformat_open_input(&formatCtx, mp4File.c_str(), nullptr, nullptr) != 0) {
         LOGE("Could not open input file");
         return;
@@ -229,7 +230,7 @@ GLuint PanoramaRenderer::createProgram(const char *vertexSrc, const char *fragme
     return program;
 }
 
-
+// 全景图像需要的函数
 GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
     AAsset *asset = AAssetManager_open(assetManager, assetPath, AASSET_MODE_STREAMING);
     if (!asset) {
@@ -346,7 +347,7 @@ void PanoramaRenderer::onSurfaceCreated() {
     glBindTexture(GL_TEXTURE_2D, videoTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight,
                  0, GL_RGB, GL_UNSIGNED_BYTE,nullptr);
-    //glGenerateMipmap(GL_TEXTURE_2D); //视频渲染不使用 glGenerateMipmap,较少性能开销
+    //glGenerateMipmap(GL_TEXTURE_2D); //全景图像使用，但是视频渲染不使用 glGenerateMipmap,较少性能开销
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -355,96 +356,291 @@ void PanoramaRenderer::onSurfaceCreated() {
     LOGI("onSurfaceCreated have successfully run.\n");
 }
 
-void PanoramaRenderer::videoDecodingLoop(){
-    LOGI("videoDecodingLoop have successfully initialized.\n");
+void PanoramaRenderer::videoDecodingLoop() {
+    //LOGI("videoDecodingLoop has successfully initialized.\n");
     AVPacket packet;
-    AVFrame* Aframe = av_frame_alloc();
+    AVFrame* vFrame = av_frame_alloc();
 
-    // SwsContext for converting YUV to RGB
+    if (!vFrame) {
+        LOGE("videoDecodingLoop: Failed to allocate AVFrame.\n");
+        return;
+    }
+
     SwsContext* swsCtx = sws_getContext(
             videoCodecCtx->width, videoCodecCtx->height, videoCodecCtx->pix_fmt,
             videoCodecCtx->width, videoCodecCtx->height, AV_PIX_FMT_RGB24,
             SWS_BILINEAR, nullptr, nullptr, nullptr);
 
-    while (!stopPlayback) {
-        if (av_read_frame(formatCtx, &packet) >= 0) {
-            if (packet.stream_index == videoStreamIndex) {
-                if (avcodec_send_packet(videoCodecCtx, &packet) >= 0) {
-                    if (avcodec_receive_frame(videoCodecCtx, Aframe) >= 0) {
-                        // Convert the frame from YUV to RGB
-                        int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, videoCodecCtx->width, videoCodecCtx->height, 32);
-                        uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
-
-                        AVFrame* rgbFrame = av_frame_alloc();
-                        av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer, AV_PIX_FMT_RGB24, videoCodecCtx->width, videoCodecCtx->height, 1);
-
-                        sws_scale(swsCtx, Aframe->data, Aframe->linesize, 0, videoCodecCtx->height, rgbFrame->data, rgbFrame->linesize);
-
-                        {
-                            std::lock_guard<std::mutex> lock(textureMutex);
-
-                            this->frame = cv::Mat(Aframe->height, Aframe->width, CV_8UC3, rgbFrame->data[0], rgbFrame->linesize[0]).clone();
-                            LOGI("videoDecodingLoop,frame.empty:%d\n",frame.empty());
-                            cv::imwrite(sharePath+"/dst_videoDecodingLoop.jpg",frame);
-                            // Ensure the frame is fully decoded and ready
-                            if (!frame.empty()) {
-                                frameReady = true;
-                                frameReadyCondition.notify_one();  // Notify the rendering thread
-                            }
-                        }
-
-                        av_free(buffer);
-                        av_frame_free(&rgbFrame);
-                    }
-                }
-                av_packet_unref(&packet);
-            }
-        } else {
-            break;  // End of video stream
-        }
+    if (!swsCtx) {
+        LOGE("videoDecodingLoop: Failed to create SwsContext.\n");
+        av_frame_free(&vFrame);
+        return;
     }
 
-    av_frame_free(&Aframe);
+    // Allocate buffer and RGB frame outside the loop to avoid frequent allocations
+    int numBytes = av_image_get_buffer_size(AV_PIX_FMT_RGB24, videoCodecCtx->width, videoCodecCtx->height, 32);
+    uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
+
+    if (!buffer) {
+        LOGE("videoDecodingLoop: Failed to allocate buffer for RGB conversion.\n");
+        av_frame_free(&vFrame);
+        sws_freeContext(swsCtx);
+        return;
+    }
+
+    AVFrame* rgbFrame = av_frame_alloc();
+    if (!rgbFrame) {
+        LOGE("videoDecodingLoop: Failed to allocate RGB frame.\n");
+        av_free(buffer);
+        av_frame_free(&vFrame);
+        sws_freeContext(swsCtx);
+        return;
+    }
+
+    av_image_fill_arrays(rgbFrame->data, rgbFrame->linesize, buffer, AV_PIX_FMT_RGB24, videoCodecCtx->width, videoCodecCtx->height, 1);
+
+    double lastPts = 0.0; // 控制播放速度
+    while (!stopPlayback) {
+        //LOGI("videoDecodingLoop: reading frame...");
+        int ret = av_read_frame(formatCtx, &packet);
+
+        if (ret < 0) {  // If we couldn't read, it's either an error or EOF
+            if (ret == AVERROR_EOF) {
+                //LOGI("videoDecodingLoop: End of file reached.\n");
+                break;  // Exit the loop if EOF is reached
+            }
+            char errBuf[128];
+            av_strerror(ret, errBuf, sizeof(errBuf));
+            LOGE("videoDecodingLoop: Failed to read frame: %s\n", errBuf);
+            continue;  // Try to read again
+        }
+
+        if (packet.stream_index == videoStreamIndex) {
+            ret = avcodec_send_packet(videoCodecCtx, &packet);
+            if (ret < 0) {
+                char errBuf[128];
+                av_strerror(ret, errBuf, sizeof(errBuf));
+                LOGE("videoDecodingLoop: Failed to send packet to decoder: %s\n", errBuf);
+                av_packet_unref(&packet);
+                continue;  // Skip this packet and continue to the next
+            }
+
+            while (true) {
+                ret = avcodec_receive_frame(videoCodecCtx, vFrame);
+                if (ret == 0) {
+                    // Convert the frame from YUV to RGB
+                    sws_scale(swsCtx, vFrame->data, vFrame->linesize, 0, videoCodecCtx->height, rgbFrame->data, rgbFrame->linesize);
+
+                    // 控制播放速度，通过帧间间隔时间休眠,与mp4文件固有帧率一致
+                    double currentPts = (double)(vFrame->best_effort_timestamp) * av_q2d(videoStream->time_base);
+                    if (lastPts != 0.0) {
+                        double frameInterval = currentPts - lastPts;
+
+                        if (frameInterval > 0) {
+                            std::this_thread::sleep_for(std::chrono::duration<double>(frameInterval));
+                        }
+                    }
+                    lastPts = currentPts;
+
+                    {
+                        std::lock_guard<std::mutex> lock(textureMutex);
+                        cv::Mat matFrame = cv::Mat(videoCodecCtx->height, videoCodecCtx->width, CV_8UC3, rgbFrame->data[0], rgbFrame->linesize[0]);
+                        cv::flip(matFrame, frame, 0);
+
+                        if (!frame.empty()) {
+                            currentVideoPts = currentPts;
+
+                            frameReady = true;
+                            frameReadyCondition.notify_one();  // Notify the rendering thread
+                            LOGI("videoDecodingLoop: buffer copied and notified.");
+                        }
+                    }
+
+                } else if (ret == AVERROR(EAGAIN)) {
+                    //LOGI("videoDecodingLoop: No frame available yet, continuing...\n");
+                    break;  // No more frames available yet
+                } else {
+                    char errBuf[128];
+                    av_strerror(ret, errBuf, sizeof(errBuf));
+                    LOGE("videoDecodingLoop: Failed to receive frame from video decoder: %s\n", errBuf);
+                    break;  // Handle errors appropriately
+                }
+            }
+        }
+        av_packet_unref(&packet);  // Unreference the packet after processing
+    }
+
+    av_free(buffer);
+    av_frame_free(&rgbFrame);
+    av_frame_free(&vFrame);
     sws_freeContext(swsCtx);
-    LOGI("videoDecodingLoop have successfully run.\n");
-            /////////////////////之前使用OpenCV解码视频播放/////////////////////////////////////
+
+//////////////////////////之前使用OpenCV解码视频播放/////////////////////////////////////
 //    while (!stopPlayback) {
 //        cv::Mat tempFrame;
 //        if (!videoCapture.read(tempFrame)) {
 //            LOGE("Failed to read frame from video");
 //            break;
 //        }
+//
 //        cv::flip(tempFrame,frame,0);
-////        cv::cvtColor(tempFrame, tempFrame, cv::COLOR_BGR2RGB);
-//        std::this_thread::sleep_for(std::chrono::milliseconds(30)); // Adjust frame rate if needed
+//        //cv::cvtColor(tempFrame, tempFrame, cv::COLOR_BGR2RGB);
+//        // std::this_thread::sleep_for(std::chrono::milliseconds(30)); // Adjust frame rate if needed
+//        {
+//            std::lock_guard<std::mutex> lock(textureMutex);
+//            if (!frame.empty()) {
+//                frameReady = true;
+//                frameReadyCondition.notify_one();  // Notify the rendering thread
+//                LOGI("videoDecodingLoop: buffer copied and notified.");
+//            }
+//        }
 //    }
 /////////////////////end of 之前使用OpenCV解码视频播放/////////////////////////////////////
+   // LOGI("videoDecodingLoop has successfully run.\n");
 }
+
+//void PanoramaRenderer::audioDecodingLoop() {
+//    LOGI("audioDecodingLoop has successfully initialized.\n");
+//
+//    AVPacket packet;
+//    AVFrame* audioFrame = av_frame_alloc();
+//    uint8_t* outBuffer = nullptr;
+//    int maxBufferSize = 0;
+//
+//    double audioClock = 0.0;  // 用于追踪音频时间
+//    double lastAudioPts = 0.0;  // 上一次的音频PTS
+//    double startTime = av_gettime_relative() / 1000000.0;  // 开始的系统时间
+//
+//    while (!stopPlayback) {
+//        if (av_read_frame(formatCtx, &packet) >= 0) {
+//            if (packet.stream_index == audioStreamIndex) {
+//                if (avcodec_send_packet(audioCodecCtx, &packet) >= 0) {
+//                    while (avcodec_receive_frame(audioCodecCtx, audioFrame) >= 0) {
+//                        int outSamples = av_rescale_rnd(
+//                                swr_get_delay(swrCtx, audioCodecCtx->sample_rate) + audioFrame->nb_samples,
+//                                44100, audioCodecCtx->sample_rate, AV_ROUND_UP);
+//
+//                        int outBufferSize = av_samples_alloc(&outBuffer, nullptr, 2, outSamples, AV_SAMPLE_FMT_S16, 0);
+//
+//                        outSamples = swr_convert(
+//                                swrCtx, &outBuffer, outSamples,
+//                                (const uint8_t**)audioFrame->data, audioFrame->nb_samples);
+//
+//                        if (outSamples > 0) {
+//                            audioBufferSize = av_samples_get_buffer_size(
+//                                    nullptr, 2, outSamples, AV_SAMPLE_FMT_S16, 1);
+//
+//                            if (audioBuffer == nullptr || audioBufferSize > maxBufferSize) {
+//                                maxBufferSize = audioBufferSize;
+//                                audioBuffer = (uint8_t*)av_malloc(maxBufferSize);
+//                                if (!audioBuffer) {
+//                                    LOGE("Failed to allocate audioBuffer.");
+//                                    break;
+//                                }
+//                            }
+//
+//                            if (audioBuffer != nullptr) {
+//                                std::memcpy(audioBuffer, outBuffer, audioBufferSize);
+//
+//                                // 获取当前音频帧的 PTS
+//                                double audioPts = (double)(audioFrame->best_effort_timestamp) * av_q2d(audioStream->time_base);
+//
+//                                // 将当前的系统时间转换为相对音频的播放时间
+//                                double currentTime = (av_gettime_relative() / 1000000.0) - startTime;
+//
+//                                // 音频时间（PTS）与当前系统时间进行比较，以同步播放
+//                                if (audioPts > currentTime) {
+//                                    double sleepTime = audioPts - currentTime;
+//                                    if (sleepTime > 0.001) {
+//                                        std::this_thread::sleep_for(std::chrono::duration<double>(sleepTime));
+//                                    }
+//                                }
+//                                audioClock = audioPts;
+//
+//                                audioBufferReady = true;
+//
+//                                // 将音频数据放入缓冲区，准备播放
+//                                (*bufferQueue)->Enqueue(bufferQueue, audioBuffer, audioBufferSize);
+//                                LOGI("audioDecodingLoop: buffer copied and audio played.");
+//                            }
+//                        }
+//
+//                        av_freep(&outBuffer);
+//                    }
+//                }
+//                av_packet_unref(&packet);
+//            }
+//        } else {
+//            LOGI("audioDecodingLoop: end of stream.");
+//            break;
+//        }
+//    }
+//
+//    av_frame_free(&audioFrame);
+//    if (audioBuffer) {
+//        av_free(audioBuffer);
+//    }
+//    LOGI("audioDecodingLoop has successfully run.\n");
+//}
+
 void PanoramaRenderer::audioDecodingLoop() {
-    LOGI("audioDecodingLoop have successfully initialized.\n");
+    LOGI("audioDecodingLoop has successfully initialized.\n");
+
     AVPacket packet;
-    AVFrame* Aframe = av_frame_alloc();
+    AVFrame* audioFrame = av_frame_alloc();
+    uint8_t* outBuffer = nullptr;
+    int maxBufferSize = 0;
 
     while (!stopPlayback) {
+        // Read audio packets
         if (av_read_frame(formatCtx, &packet) >= 0) {
             if (packet.stream_index == audioStreamIndex) {
                 if (avcodec_send_packet(audioCodecCtx, &packet) >= 0) {
-                    while (avcodec_receive_frame(audioCodecCtx, Aframe) >= 0) {
-                        // 处理音频帧，放入音频缓冲区播放
-                        uint8_t* outBuffer = nullptr;
-                        int outSamples = av_rescale_rnd(swr_get_delay(swrCtx, audioCodecCtx->sample_rate) + Aframe->nb_samples,
-                                                        44100, audioCodecCtx->sample_rate, AV_ROUND_UP);
+                    while (avcodec_receive_frame(audioCodecCtx, audioFrame) >= 0) {
+                        // Convert audio frame to desired format
+                        int outSamples = av_rescale_rnd(
+                                swr_get_delay(swrCtx, audioCodecCtx->sample_rate) + audioFrame->nb_samples,
+                                44100, audioCodecCtx->sample_rate, AV_ROUND_UP);
+
                         int outBufferSize = av_samples_alloc(&outBuffer, nullptr, 2, outSamples, AV_SAMPLE_FMT_S16, 0);
 
-                        outSamples = swr_convert(swrCtx, &outBuffer, outSamples, (const uint8_t**)Aframe->data, Aframe->nb_samples);
+                        outSamples = swr_convert(
+                                swrCtx, &outBuffer, outSamples,
+                                (const uint8_t**)audioFrame->data, audioFrame->nb_samples);
 
                         if (outSamples > 0) {
-                            audioBufferSize = av_samples_get_buffer_size(nullptr, 2, outSamples, AV_SAMPLE_FMT_S16, 1);
-                            memcpy(audioBuffer, outBuffer, audioBufferSize);
+                            audioBufferSize = av_samples_get_buffer_size(
+                                    nullptr, 2, outSamples, AV_SAMPLE_FMT_S16, 1);
 
-                            // 向音频线程发送缓冲区数据
-                            std::unique_lock<std::mutex> lock(audioMutex);
-                            audioCondVar.notify_one();
+                            if (audioBuffer == nullptr || audioBufferSize > maxBufferSize) {
+                                maxBufferSize = audioBufferSize;
+                                audioBuffer = (uint8_t*)av_malloc(maxBufferSize);
+                                if (!audioBuffer) {
+                                    LOGE("Failed to allocate audioBuffer.");
+                                    break;
+                                }
+                            }
+
+                            if (audioBuffer != nullptr) {
+                                std::memcpy(audioBuffer, outBuffer, audioBufferSize);
+
+                                // Sync audio playback with video PTS (Presentation Time Stamp)
+                                double audioPts = (double)(audioFrame->best_effort_timestamp) * av_q2d(audioStream->time_base);
+
+                                {
+                                    std::unique_lock<std::mutex> lock(audioMutex);
+                                    while (audioPts > currentVideoPts && !stopPlayback) {
+                                        audioCondVar.wait(lock);  // Wait until video is caught up
+                                        // 在音频数据准备好后通知其他线程
+                                        audioBufferReady = true;
+                                        audioCondVar.notify_all();
+                                    }
+
+                                }
+                                // Enqueue audio data to OpenSL ES
+                                (*bufferQueue)->Enqueue(bufferQueue, audioBuffer, audioBufferSize);
+                                LOGI("audioDecodingLoop: buffer copied and audio played.");
+                            }
                         }
 
                         av_freep(&outBuffer);
@@ -453,16 +649,21 @@ void PanoramaRenderer::audioDecodingLoop() {
                 av_packet_unref(&packet);
             }
         } else {
-            break;  // 结束音频流
+            LOGI("audioDecodingLoop: end of stream.");
+            break;
         }
     }
 
-    av_frame_free(&Aframe);
-    LOGI("audioDecodingLoop have successfully run.\n");
+    av_frame_free(&audioFrame);
+    if (audioBuffer) {
+        av_free(audioBuffer);
+    }
+    LOGI("audioDecodingLoop has successfully run.\n");
 }
 
 void PanoramaRenderer::initializeAudio() {
-    LOGI("initializeAudio have successfully initialized.\n");
+    LOGI("initializeAudio has successfully initialized.\n");
+
     // Create OpenSL ES engine and output mix
     slCreateEngine(&engineObject, 0, nullptr, 0, nullptr, nullptr);
     (*engineObject)->Realize(engineObject, SL_BOOLEAN_FALSE);
@@ -472,15 +673,11 @@ void PanoramaRenderer::initializeAudio() {
 
     // Create the audio player
     SLDataLocator_AndroidSimpleBufferQueue loc_bufq = {SL_DATALOCATOR_ANDROIDSIMPLEBUFFERQUEUE, 1};
-    // 提取声道数
-    int channels = 0;
-    if (audioCodecCtx->ch_layout.nb_channels > 0) {
-        channels = audioCodecCtx->ch_layout.nb_channels;
-    } else {
-        LOGE("Failed to get channel count from AVChannelLayout");
-        return;
-    }
-    // 设置 OpenSL ES 的音频格式
+
+    // Set up the channel count
+    int channels = (audioCodecCtx->ch_layout.nb_channels > 0) ? audioCodecCtx->ch_layout.nb_channels : 1;
+
+    // Set OpenSL ES audio format
     SLDataFormat_PCM format_pcm = {
             SL_DATAFORMAT_PCM,
             (SLuint32)channels,
@@ -490,8 +687,8 @@ void PanoramaRenderer::initializeAudio() {
             (channels == 2) ? SL_SPEAKER_FRONT_LEFT | SL_SPEAKER_FRONT_RIGHT : SL_SPEAKER_FRONT_CENTER,
             SL_BYTEORDER_LITTLEENDIAN
     };
-    SLDataSource audioSrc = {&loc_bufq, &format_pcm};
 
+    SLDataSource audioSrc = {&loc_bufq, &format_pcm};
     SLDataLocator_OutputMix loc_outmix = {SL_DATALOCATOR_OUTPUTMIX, outputMixObject};
     SLDataSink audioSnk = {&loc_outmix, nullptr};
 
@@ -505,15 +702,28 @@ void PanoramaRenderer::initializeAudio() {
     // Register callback for buffer queue
     (*bufferQueue)->RegisterCallback(bufferQueue, [](SLAndroidSimpleBufferQueueItf bq, void* context) {
         auto* renderer = static_cast<PanoramaRenderer*>(context);
+
+        // 使用线程锁的形式？// 在音频初始化完成后通知等待线程
         std::unique_lock<std::mutex> lock(renderer->audioMutex);
-        renderer->audioCondVar.wait(lock);
-        (*bq)->Enqueue(bq, renderer->audioBuffer, renderer->audioBufferSize);
+        renderer->audioBufferReady = true;
+        renderer->audioCondVar.notify_all();
+//        if (renderer->audioBuffer && renderer->audioBufferSize > 0) {
+//            (*bq)->Enqueue(bq, renderer->audioBuffer, renderer->audioBufferSize);
+//        }
+
+        // 使用flag形式，引入变量audioBufferReady？
+//        if (renderer->audioBufferReady) {
+//            (*bq)->Enqueue(bq, renderer->audioBuffer, renderer->audioBufferSize);
+//            renderer->audioBufferReady = false;  // Reset the flag
+//        }
     }, this);
 
     // Start playing audio
     (*playerPlay)->SetPlayState(playerPlay, SL_PLAYSTATE_PLAYING);
-    LOGI("initializeAudio have successfully run.\n");
+    LOGI("initializeAudio has successfully run.\n");
 }
+
+
 
 void PanoramaRenderer::shutdownAudio() {
     LOGI("shutdownAudio have successfully initialized.\n");
@@ -541,12 +751,7 @@ void PanoramaRenderer::onDrawFrame() {
     glUseProgram(shaderProgram);
 
     projection = glm::perspective(glm::radians(55.0f), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
-    //LOGI("onDrawFrame,图像width:%d,height:%d\n",widthScreen,heightScreen);
-    // 小行星
-    // 计算相机的位置，假设以 (0, 0, 0) 为中心点，围绕Y轴和X轴旋转
-    // 使用球面坐标来实现环绕效果
-//    float radius = 5.0f; // 距离，从球心到相机的距离
-    view = glm::lookAt(glm::vec3(0.0f,0.0f,0.0f)*zoom , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) * zoom, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 0.0f, 1.0f));
     view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -557,24 +762,39 @@ void PanoramaRenderer::onDrawFrame() {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
     glBindVertexArray(vao);
+    // 视频渲染
     {
         std::unique_lock<std::mutex> lock(textureMutex);
-        // Wait until the frame is ready
-        frameReadyCondition.wait(lock, [this] { return frameReady; });
-        LOGI("onDrawFrame,frame.empty():%d\n",frame.empty());
-        if (!frame.empty()) {
-            cv::imwrite(sharePath+"/dst_ondrawFrame.jpg",frame);
-            glBindTexture(GL_TEXTURE_2D, videoTexture);
-            // Upload the frame to OpenGL and render it
-            glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+        if (frameReadyCondition.wait_for(lock, std::chrono::milliseconds(100), [this] { return frameReady; })) {
+            LOGI("onDrawFrame, frame.empty():%d\n", frame.empty());
+            if (!frame.empty()) {
+                cv::imwrite(sharePath + "/dst_ondrawFrame.jpg", frame);
+                glBindTexture(GL_TEXTURE_2D, videoTexture);
+                glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+            }
+            frameReady = false;
+        } else {
+            LOGI("onDrawFrame: No new frame ready, skipping draw.");
         }
-        // Mark the frame as processed
-        frameReady = false;
     }
-//    glActiveTexture(GL_TEXTURE0);
-//    glBindTexture(GL_TEXTURE_2D, texture);
+
+    // 音频同步
+    {
+        std::unique_lock<std::mutex> lock(audioMutex);
+        // 等待音频缓冲区准备好
+        audioCondVar.wait_for(lock,std::chrono::milliseconds(100), [this]() { return audioBufferReady; });
+        if (audioBufferReady) {
+            // Enqueue the audio buffer for playback
+            (*bufferQueue)->Enqueue(bufferQueue, audioBuffer, audioBufferSize);
+        }
+        audioBufferReady = false;  // Reset the flag
+    }
+
+
+    //    glActiveTexture(GL_TEXTURE0);  // 全景图像使用
+//    glBindTexture(GL_TEXTURE_2D, texture);// 全景图像使用
     glDrawElements(GL_TRIANGLES, sphereData->getNumIndices(), GL_UNSIGNED_SHORT, 0);
-    glBindVertexArray(0);// 解绑 VAO
+    glBindVertexArray(0);  // Unbind VAO
     LOGI("onDrawFrame have successfully run.\n");
 }
 
