@@ -5,7 +5,7 @@
 #ifndef MY360PANORAMA_OPENCV_UTILS_H
 #define MY360PANORAMA_OPENCV_UTILS_H
 
-#include <opencv2/core.hpp>
+#include "opencv2/opencv.hpp"
 using namespace cv;
 void myFlip(Mat& src);
 void myBlur(Mat& src, float sigma);

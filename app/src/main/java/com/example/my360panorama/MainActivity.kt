@@ -1,12 +1,12 @@
 package com.example.my360panorama
 
 import android.content.res.AssetManager
-import android.content.pm.PackageManager
 import android.opengl.GLSurfaceView
 import android.os.Bundle
-import android.util.Log
-import androidx.appcompat.app.AppCompatActivity
+import android.view.Surface
 import android.view.MotionEvent
+import androidx.appcompat.app.AppCompatActivity
+import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
@@ -19,6 +19,8 @@ class MainActivity : AppCompatActivity() {
     private var previousY = 0f
     private var previousDistance = 0f
 
+    private lateinit var ijkMediaPlayer: IjkMediaPlayer
+
     companion object {
         init {
             System.loadLibrary("my360panorama")
@@ -28,10 +30,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         glSurfaceView = GLSurfaceView(this)
-        glSurfaceView.setEGLContextClientVersion(3)
+        glSurfaceView.setEGLContextClientVersion(2)
 
-        renderer = PanoramaRenderer(assets,filesDir.absolutePath)
+        renderer = PanoramaRenderer(assets, filesDir.absolutePath)
         glSurfaceView.setRenderer(renderer)
+
 
         glSurfaceView.setOnTouchListener { _, event ->
             when (event.pointerCount) {
@@ -42,6 +45,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(glSurfaceView)
+
+        ijkMediaPlayer = IjkMediaPlayer()
+    }
+
+    override fun onResume() {
+
+        super.onResume()
+        try {
+            ijkMediaPlayer.setSurface(glSurfaceView.holder.surface)
+            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/360panorama.mp4" // 这是是视频文件路径
+            ijkMediaPlayer.setOnPreparedListener { iMediaPlayer -> iMediaPlayer.start() }
+            ijkMediaPlayer.prepareAsync()
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun handleDrag(event: MotionEvent) {
@@ -65,8 +84,8 @@ class MainActivity : AppCompatActivity() {
 
             if (previousDistance != 0f) {
                 val scaleFactor = distance / previousDistance
-                if (scaleFactor!=0f) {
-                    renderer.nativeHandlePinchZoom(renderer.nativeRendererPtr, 1/scaleFactor)
+                if (scaleFactor != 0f) {
+                    renderer.nativeHandlePinchZoom(renderer.nativeRendererPtr, 1 / scaleFactor)
                 }
             }
             previousDistance = distance
@@ -76,7 +95,8 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    private class PanoramaRenderer(assetManager: AssetManager,private val path: String) : GLSurfaceView.Renderer {
+    private class PanoramaRenderer(assetManager: AssetManager, private val path: String) :
+        GLSurfaceView.Renderer {
         var nativeRendererPtr: Long
 
         init {
@@ -105,5 +125,7 @@ class MainActivity : AppCompatActivity() {
         private external fun nativeOnSurfaceChanged(rendererPtr: Long, width: Int, height: Int)
         external fun nativeHandleTouchDrag(rendererPtr: Long, deltaX: Float, deltaY: Float)
         external fun nativeHandlePinchZoom(rendererPtr: Long, scaleFactor: Float)
+
+        external fun nativeProcessFrame(rendererPtr: Long,yuvData: ByteArray, width: Int, height: Int): Unit // ffmpeg解码帧传递给C++
     }
 }

@@ -1,7 +1,7 @@
 #ifndef PANORAMARENDERER_H
 #define PANORAMARENDERER_H
 
-#include <GLES3/gl3.h>
+#include <GLES2/gl2.h>
 #include "opencv2/opencv.hpp"
 #include "Sphere.h"
 
@@ -37,6 +37,8 @@ extern "C" {
 // Android AudioTrack
 #include <SLES/OpenSLES.h>
 #include <SLES/OpenSLES_Android.h>
+#include <pthread.h>
+#include <sched.h>
 
 #define LOG_TAG "PanoramaRenderer"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -53,26 +55,7 @@ extern "C" {
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 
-//class AudioBuffer {
-//public:
-//    void push(const std::vector<uint8_t>& data) {
-//        std::lock_guard<std::mutex> lock(mutex_);
-//        buffer.insert(buffer.end(), data.begin(), data.end());
-//    }
-//
-//    bool pop(std::vector<uint8_t>& data, size_t size) {
-//        std::lock_guard<std::mutex> lock(mutex_);
-//        if (buffer.size() < size) return false;
-//
-//        data.assign(buffer.begin(), buffer.begin() + size);
-//        buffer.erase(buffer.begin(), buffer.begin() + size);
-//        return true;
-//    }
-//
-//private:
-//    std::vector<uint8_t> buffer;
-//    std::mutex mutex_;
-//};
+
 
 class PanoramaRenderer {
 public:
@@ -86,6 +69,8 @@ public:
     void handleTouchDrag(float deltaX, float deltaY);
     void handlePinchZoom(float scaleFactor);
 
+    void processFrame(const cv::Mat& rgbFrame);
+
 private:
     GLuint loadShader(GLenum type, const char *shaderSrc);
     GLuint createProgram(const char *vertexSrc, const char *fragmentSrc);
@@ -93,25 +78,16 @@ private:
     // 全景图像需要的函数
     GLuint loadTexture(const char *assetPath);
 
-    // 全景视频音视频播放需要的函数
-    void videoDecodingLoop();
-    void audioDecodingLoop();
-    void initializeAudio();
-    void shutdownAudio();
-
     // 全景图片和视频渲染
     GLuint shaderProgram;
     GLuint texture; // 全景图片纹理
     GLuint vao, vboVertices, vboTexCoords,vboIndices;
     SphereData* sphereData;
-    //cv::VideoCapture videoCapture;
     cv::Mat frame;  // 全景视频帧
     int frameWidth,frameHeight; //全景视频帧的宽和高
     GLuint videoTexture; // 全景视频帧纹理
-    std::condition_variable frameReadyCondition;
     cv::VideoCapture videoCapture; // 使用OpenCV解码
-    bool frameReady; // 是否准备好帧，即解码帧
-    double currentVideoPts; // 音视频同步变量
+
     std::mutex textureMutex; // 纹理线程锁
     AAssetManager* assetManager;
     std::string sharePath; // 共享文件夹，具有读写权限, JNI传入
@@ -123,32 +99,6 @@ private:
     int widthScreen;
     int heightScreen;
 
-   // FFmpeg音视频解码，播放，同步
-    AVFormatContext* formatCtx;
-    AVCodecContext* videoCodecCtx;
-    AVCodecContext* audioCodecCtx;
-    AVStream* videoStream;
-    AVStream* audioStream;
-    SwrContext* swrCtx;
-    int videoStreamIndex;
-    int audioStreamIndex;
-    std::thread videoThread;
-    std::thread audioThread;
-    std::atomic<bool> stopPlayback;
-
-    // Audio playback
-    SLObjectItf engineObject;
-    SLEngineItf engineEngine;
-    SLObjectItf outputMixObject;
-    SLObjectItf playerObject;
-    SLPlayItf playerPlay;
-    SLAndroidSimpleBufferQueueItf bufferQueue;
-    std::condition_variable audioCondVar;
-    bool audioBufferReady;
-    std::mutex audioMutex;
-    uint8_t* audioBuffer;
-    //AudioBuffer* audioBuffer;
-    size_t audioBufferSize;
 };
 
 #endif // PANORAMARENDERER_H
