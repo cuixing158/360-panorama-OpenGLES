@@ -177,7 +177,21 @@ set(arm64_v8a_sources
 set(OpenCV_STATIC ON)
 #set(OpenCV_DIR "E:/softwares/opencv-4.10.0-android-sdk/OpenCV-android-sdk/sdk/native/jni")
 #find_package(OpenCV REQUIRED)
+add_library(opencv
+        SHARED
+        IMPORTED)
+set_target_properties(opencv
+        PROPERTIES IMPORTED_LOCATION
+        ../../../../libs/${CMAKE_ANDROID_ARCH_ABI}/libopencv_java4.so)
 
+find_library(log-lib log)
+find_library(m-lib m)
+find_library(z-lib z)
+find_library(android-lib android)
+find_library(EGL-lib EGL)
+find_library(jnigraphics-lib jnigraphics)
+find_library(GLES-lib GLESv2)
+find_library(OpenSLES-lib OpenSLES)
 
 if (${ANDROID_ABI} STREQUAL armeabi-v7a)
     add_library( # Sets the name of the library.
@@ -185,6 +199,8 @@ if (${ANDROID_ABI} STREQUAL armeabi-v7a)
             SHARED
             ${common_sources}
             ${armeabi_v7a_sources}
+            PanoramaRenderer.cpp
+            Sphere.cpp
     )
 else ()
     add_library( # Sets the name of the library.
@@ -192,6 +208,8 @@ else ()
             SHARED
             ${common_sources}
             ${arm64_v8a_sources}
+            PanoramaRenderer.cpp
+            Sphere.cpp
     )
 endif ()
 
@@ -219,17 +237,6 @@ set_target_properties(ijksdl-lib
         PROPERTIES IMPORTED_LOCATION
         libijksdl.so)
 
-find_library(log-lib log)
-find_library(m-lib m)
-find_library(z-lib z)
-find_library(android-lib android)
-find_library(EGL-lib EGL)
-find_library(jnigraphics-lib jnigraphics)
-find_library(GLES-lib GLESv2)
-find_library(OpenSLES-lib OpenSLES)
-
-
-
 
 # Specifies libraries CMake should link to your target library. You
 # can link multiple libraries, such as libraries you define in this
@@ -240,7 +247,10 @@ target_link_libraries( # Specifies the target library.
 
         # Links the target library to the log library
         # included in the NDK.
-        ijkffmpeg-lib ${log-lib} ${m-lib} ${z-lib} ${android-lib} ${EGL-lib} ${GLES-lib} ${jnigraphics-lib} ${OpenSLES-lib})
+        ijkffmpeg-lib ${log-lib} ${m-lib} ${z-lib} ${android-lib} ${EGL-lib} ${GLES-lib} ${jnigraphics-lib} ${OpenSLES-lib}
+        opencv
+        EGL
+        GLESv3)
 target_include_directories(
         ijkplayer PUBLIC
         ${CMAKE_SOURCE_DIR}
@@ -301,12 +311,7 @@ find_library(OpenSLES_LIB OpenSLES)
 #    message("This is arm64-v8a")
 #endif ()
 
-add_library(opencv
-        SHARED
-        IMPORTED)
-set_target_properties(opencv
-        PROPERTIES IMPORTED_LOCATION
-        ../../../../libs/${CMAKE_ANDROID_ARCH_ABI}/libopencv_java4.so)
+
 
 
 # Creates and names a library, sets it as either STATIC

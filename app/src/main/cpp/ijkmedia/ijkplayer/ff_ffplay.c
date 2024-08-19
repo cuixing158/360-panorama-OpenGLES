@@ -22,6 +22,15 @@
 
 #include "ff_ffplay.h"
 
+
+// 添加钩子函数，用于在PanoramaRenderer.cpp中给解码的帧赋值给OpengGl 渲染
+#include "PanoramaRenderer.h"
+
+// Add a declaration for your custom function
+//extern PanoramaRenderer* g_panoramaRenderer;
+//extern  void processDecodedFrame(AVFrame* frame);
+void  processDecodedFrame(AVFrame* avFrame);
+/////////////////end of 钩子函数////////////
 /**
  * @file
  * simple media player based on the FFmpeg libraries
@@ -878,6 +887,10 @@ static void video_image_display2(FFPlayer *ffp)
     vp = frame_queue_peek_last(&is->pictq);
 
     if (vp->bmp) {
+
+        // Before rendering the frame, call your custom function
+        processDecodedFrame(vp->frame);
+
         if (is->subtitle_st) {
             if (frame_queue_nb_remaining(&is->subpq) > 0) {
                 sp = frame_queue_peek(&is->subpq);

@@ -1,5 +1,37 @@
 #include "PanoramaRenderer.h"
 
+
+// 钩子函数，从ff_ffplay.c中执行
+ cv::Mat PanoramaRenderer::frame;
+ std::mutex PanoramaRenderer::textureMutex;
+
+void  processDecodedFrame(AVFrame* avFrame){
+    PanoramaRenderer::processDecodedFrameImpl( avFrame);
+}
+
+ void  PanoramaRenderer::processDecodedFrameImpl(AVFrame* avFrame) {
+//    PanoramaRenderer* renderer = getRendererInstance(); // Get your renderer instance
+     if (avFrame)
+     {
+         LOGI("avFrame 解码成功\n");
+     }else  {
+         LOGI("avFrame 未解码成功\n");
+     }
+
+    if (avFrame&&avFrame->data[0]) {
+        // Convert AVFrame to cv::Mat
+        cv::Mat yuvFrame(avFrame->height, avFrame->width, CV_8UC1, avFrame->data[0]);
+
+        // Convert YUV to RGB (OpenCV's cvtColor can handle this)
+        cv::Mat rgbFrame;
+        cv::cvtColor(yuvFrame, rgbFrame, cv::COLOR_YUV2RGB_NV12);
+
+        // Lock the textureMutex and update the frame
+        std::lock_guard<std::mutex> lock(textureMutex);
+        frame = rgbFrame.clone();
+    }
+}
+
 PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filepath)
     : shaderProgram(0), texture(0), videoTexture(0),vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
@@ -238,6 +270,8 @@ void PanoramaRenderer::onSurfaceCreated() {
 //}
 
 void PanoramaRenderer::onDrawFrame() {
+    updateVideoFrame();
+
     LOGI("onDrawFrame have successfully initialized.\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -256,7 +290,8 @@ void PanoramaRenderer::onDrawFrame() {
 
     glBindVertexArray(vao);
     // 视频渲染
-    frame = cv::Mat(640,1280,CV_8UC3,cv::Scalar::all(255));
+//    frame = cv::Mat(640,1280,CV_8UC3,cv::Scalar(0,255,0));
+//  frame = cv::imread(sharePath+"/dst_videoDecodingLoop.jpg");
     {
         std::unique_lock<std::mutex> lock(textureMutex);
             LOGI("onDrawFrame, frame.empty():%d\n", frame.empty());
@@ -297,6 +332,41 @@ void PanoramaRenderer::processFrame(const cv::Mat& rgbFrame) {
         frame = rgbFrame.clone();
 }
 
+// Create external texture for video frames
+GLuint PanoramaRenderer::createExternalTexture() {
+    GLuint textureId;
+    glGenTextures(1, &textureId);
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, textureId);
+
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_EXTERNAL_OES, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // Unbind texture
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, 0);
+
+    return textureId;
+}
+
+// Update video frame
+void PanoramaRenderer::updateVideoFrame() {
+    std::lock_guard<std::mutex> lock(textureMutex);  // Lock for thread safety
+
+    if (frame.empty()) {
+        return;  // No frame to update
+    }
+
+    // Update the OpenGL texture with the current video frame
+    glBindTexture(GL_TEXTURE_EXTERNAL_OES, videoTexture);
+
+    // Upload frame data to texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
+
+    glBindTexture(GL_TEXTURE_2D, 0);  // Unbind texture
+}
+
+
 
 // JNI Interfaces
 extern "C" {
@@ -310,16 +380,27 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeCreateRe
     return reinterpret_cast<jlong>(new PanoramaRenderer(mgr,std::string(temp)));
 }
 
+JNIEXPORT jint JNICALL
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeCreateExternalTexture(JNIEnv *env, jobject instance, jlong rendererPtr) {
+    // Cast the renderer pointer to your PanoramaRenderer class
+    PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
+    // Call the createExternalTexture function and return the texture ID
+    return renderer->createExternalTexture();
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnDrawFrame(JNIEnv *env, jobject instance, jlong rendererPtr) {
+    // Cast the renderer pointer to your PanoramaRenderer class
+    PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
+
+    // Call the onDrawFrame function which should include the call to updateVideoFrame()
+    renderer->onDrawFrame();
+}
+
 JNIEXPORT void JNICALL
 Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnSurfaceCreated(JNIEnv *env, jobject obj, jlong rendererPtr) {
     PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
     renderer->onSurfaceCreated();
-}
-
-JNIEXPORT void JNICALL
-Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnDrawFrame(JNIEnv *env, jobject obj, jlong rendererPtr) {
-    PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
-    renderer->onDrawFrame();
 }
 
 JNIEXPORT void JNICALL
