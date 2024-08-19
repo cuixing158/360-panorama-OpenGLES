@@ -90,6 +90,7 @@ public:
     void handleTouchDrag(float deltaX, float deltaY);
     void handlePinchZoom(float scaleFactor);
 
+    // 暂时没用到，之前准备想从JAVA端把ffmpeg解码的视频帧传递进来处理的
     void processFrame(const cv::Mat& rgbFrame);
 
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.

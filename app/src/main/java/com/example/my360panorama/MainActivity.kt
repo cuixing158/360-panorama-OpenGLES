@@ -170,6 +170,6 @@ class MainActivity : AppCompatActivity() {
         private external fun nativeOnSurfaceChanged(rendererPtr: Long, width: Int, height: Int)
         external fun nativeHandleTouchDrag(rendererPtr: Long, deltaX: Float, deltaY: Float)
         external fun nativeHandlePinchZoom(rendererPtr: Long, scaleFactor: Float)
-        external fun nativeProcessFrame(rendererPtr: Long, yuvData: ByteArray, width: Int, height: Int)
+        external fun nativeProcessFrame(rendererPtr: Long, yuvData: ByteArray, width: Int, height: Int) // 暂时弃用，因为java端拿不到底层player图像数据
     }
 }

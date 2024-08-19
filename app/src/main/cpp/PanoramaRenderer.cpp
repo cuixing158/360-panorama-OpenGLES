@@ -10,26 +10,50 @@ void  processDecodedFrame(AVFrame* avFrame){
 }
 
  void  PanoramaRenderer::processDecodedFrameImpl(AVFrame* avFrame) {
-//    PanoramaRenderer* renderer = getRendererInstance(); // Get your renderer instance
-     if (avFrame)
-     {
-         LOGI("avFrame 解码成功\n");
-     }else  {
-         LOGI("avFrame 未解码成功\n");
+// Check if the frame is in a format OpenCV understands
+     if (avFrame->format != AV_PIX_FMT_BGR24 && avFrame->format != AV_PIX_FMT_RGB24) {
+         // Convert frame to BGR24 or RGB24 format using sws_scale
+         struct SwsContext* img_convert_ctx = sws_getContext(
+                 avFrame->width, avFrame->height, (AVPixelFormat)avFrame->format,
+                 avFrame->width, avFrame->height, AV_PIX_FMT_BGR24, SWS_BICUBIC,
+                 nullptr, nullptr, nullptr);
+
+         AVFrame* pFrameBGR = av_frame_alloc();
+         int numBytes = av_image_get_buffer_size(AV_PIX_FMT_BGR24, avFrame->width, avFrame->height, 1);
+         uint8_t* buffer = (uint8_t*)av_malloc(numBytes * sizeof(uint8_t));
+
+         av_image_fill_arrays(pFrameBGR->data, pFrameBGR->linesize, buffer,
+                              AV_PIX_FMT_BGR24, avFrame->width, avFrame->height, 1);
+
+         sws_scale(img_convert_ctx, avFrame->data, avFrame->linesize, 0, avFrame->height,
+                   pFrameBGR->data, pFrameBGR->linesize);
+
+         // Now pFrameBGR contains the BGR24 formatted data.
+         // Convert this frame to OpenCV Mat
+         cv::Mat img(cv::Size(avFrame->width, avFrame->height), CV_8UC3, pFrameBGR->data[0], pFrameBGR->linesize[0]);
+         {
+             // Lock the textureMutex and update the frame
+             std::lock_guard<std::mutex> lock(textureMutex);
+             cv::cvtColor(img,img,cv::COLOR_BGR2RGB);
+             cv::flip(img,img,0);
+             frame = img.clone();
+         }
+
+         // Free resources
+         av_free(buffer);
+         av_frame_free(&pFrameBGR);
+         sws_freeContext(img_convert_ctx);
+     } else {
+         // If the frame is already in BGR24 or RGB24 format, directly create the Mat
+         cv::Mat img(cv::Size(avFrame->width, avFrame->height), CV_8UC3, avFrame->data[0], avFrame->linesize[0]);
+         {
+             // Lock the textureMutex and update the frame
+             std::lock_guard<std::mutex> lock(textureMutex);
+             cv::cvtColor(img,img,cv::COLOR_BGR2RGB);
+             cv::flip(img,img,0);
+             frame = img.clone();
+         }
      }
-
-    if (avFrame&&avFrame->data[0]) {
-        // Convert AVFrame to cv::Mat
-        cv::Mat yuvFrame(avFrame->height, avFrame->width, CV_8UC1, avFrame->data[0]);
-
-        // Convert YUV to RGB (OpenCV's cvtColor can handle this)
-        cv::Mat rgbFrame;
-        cv::cvtColor(yuvFrame, rgbFrame, cv::COLOR_YUV2RGB_NV12);
-
-        // Lock the textureMutex and update the frame
-        std::lock_guard<std::mutex> lock(textureMutex);
-        frame = rgbFrame.clone();
-    }
 }
 
 PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filepath)
@@ -290,13 +314,12 @@ void PanoramaRenderer::onDrawFrame() {
 
     glBindVertexArray(vao);
     // 视频渲染
-//    frame = cv::Mat(640,1280,CV_8UC3,cv::Scalar(0,255,0));
 //  frame = cv::imread(sharePath+"/dst_videoDecodingLoop.jpg");
     {
         std::unique_lock<std::mutex> lock(textureMutex);
             LOGI("onDrawFrame, frame.empty():%d\n", frame.empty());
             if (!frame.empty()) {
-                cv::imwrite(sharePath + "/dst_ondrawFrame.jpg", frame);
+                //cv::imwrite(sharePath + "/dst_ondrawFrame.jpg", frame);
                 glBindTexture(GL_TEXTURE_2D, videoTexture);
                 glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_RGB, GL_UNSIGNED_BYTE, frame.data);
             }
@@ -421,6 +444,7 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeHandlePi
     renderer->handlePinchZoom(scaleFactor);
 }
 
+// 本函数暂时没用到，因为JAVA端无法获取Ffmpeg解码的视频帧数据
 JNIEXPORT void JNICALL
 Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeProcessFrame(JNIEnv *env, jobject obj, jlong rendererPtr, jbyteArray yuvData, jint width, jint height){
     PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
