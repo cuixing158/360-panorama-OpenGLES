@@ -1,6 +1,10 @@
 package com.example.my360panorama
-
+import android.content.Context
 import android.content.res.AssetManager
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
 import android.opengl.GLSurfaceView
 import android.os.Bundle
 import android.graphics.SurfaceTexture
@@ -14,7 +18,7 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var glSurfaceView: GLSurfaceView
     private lateinit var renderer: PanoramaRenderer
 
@@ -26,6 +30,10 @@ class MainActivity : AppCompatActivity() {
     private var surfaceTexture: SurfaceTexture? = null
     private var surface: Surface? = null
     private var textureID: Int = 0
+    
+    private lateinit var sensorManager: SensorManager
+    private var gyroSensor: Sensor? = null
+    private var accSensor: Sensor? = null
 
     companion object {
         init {
@@ -52,10 +60,19 @@ class MainActivity : AppCompatActivity() {
         setContentView(glSurfaceView)
 
         ijkMediaPlayer = IjkMediaPlayer()
+        
+        // Initialize sensor manager and sensors
+        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
+        gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+        accSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
     }
 
     override fun onResume() {
         super.onResume()
+        // Register the sensor listeners
+        gyroSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        accSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+
         try {
             // Initialize the SurfaceTexture and Surface
             surfaceTexture = renderer.createSurfaceTexture()
@@ -63,7 +80,7 @@ class MainActivity : AppCompatActivity() {
 
             // Set the Surface to the IJKPlayer
             ijkMediaPlayer.setSurface(surface)
-            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/360panorama.mp4" // Your video file path
+            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/panorama.mp4" // Your video file path
             ijkMediaPlayer.setOnPreparedListener { iMediaPlayer -> iMediaPlayer.start() }
             ijkMediaPlayer.prepareAsync()
 
@@ -84,6 +101,8 @@ class MainActivity : AppCompatActivity() {
         ijkMediaPlayer.release()
         surfaceTexture?.release()
         surface?.release()
+           // Unregister the sensor listeners
+        sensorManager.unregisterListener(this)
     }
 
     private fun handleDrag(event: MotionEvent) {
@@ -115,6 +134,30 @@ class MainActivity : AppCompatActivity() {
         } else if (event.actionMasked == MotionEvent.ACTION_DOWN || event.actionMasked == MotionEvent.ACTION_POINTER_DOWN) {
             previousDistance = 0f
         }
+    }
+
+        // Implement sensor event listener methods
+    override fun onSensorChanged(event: SensorEvent) {
+        when (event.sensor.type) {
+            Sensor.TYPE_GYROSCOPE -> {
+                val gyroX = event.values[0]
+                val gyroY = event.values[1]
+                val gyroZ = event.values[2]
+                // Call native function to pass gyro data
+                renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr, gyroX, gyroY, gyroZ, 0f, 0f, 0f)
+            }
+            Sensor.TYPE_ACCELEROMETER -> {
+                val accX = event.values[0]
+                val accY = event.values[1]
+                val accZ = event.values[2]
+                // Call native function to pass accelerometer data
+                renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr,0f, 0f, 0f, accX, accY, accZ)
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
+        // Handle sensor accuracy changes if needed
     }
 
     private class PanoramaRenderer(assetManager: AssetManager, private val path: String) :
@@ -170,6 +213,6 @@ class MainActivity : AppCompatActivity() {
         private external fun nativeOnSurfaceChanged(rendererPtr: Long, width: Int, height: Int)
         external fun nativeHandleTouchDrag(rendererPtr: Long, deltaX: Float, deltaY: Float)
         external fun nativeHandlePinchZoom(rendererPtr: Long, scaleFactor: Float)
-        external fun nativeProcessFrame(rendererPtr: Long, yuvData: ByteArray, width: Int, height: Int) // 暂时弃用，因为java端拿不到底层player图像数据
+        external fun nativeOnGyroAccUpdate(rendererPtr: Long,gyroX: Float, gyroY: Float, gyroZ: Float, accX: Float, accY: Float, accZ: Float)
     }
 }

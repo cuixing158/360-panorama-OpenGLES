@@ -60,7 +60,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     : shaderProgram(0), texture(0), videoTexture(0),vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
-    widthScreen(800),heightScreen(800){
+    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f){
 
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -312,7 +312,7 @@ void PanoramaRenderer::onDrawFrame() {
     if (fovDeg>160)
         fovDeg = 160;
     projection = glm::perspective(glm::radians(fovDeg), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
-    view = glm::lookAt(glm::vec3(-1.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 0.0f, 1.0f));
     view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -360,9 +360,60 @@ void PanoramaRenderer::handlePinchZoom(float scaleFactor) {
     zoom *= scaleFactor;
 }
 
-void PanoramaRenderer::processFrame(const cv::Mat& rgbFrame) {
-        std::lock_guard<std::mutex> lock(textureMutex);
-        frame = rgbFrame.clone();
+void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ){
+
+    glm::vec3 gyro(gyroX, gyroY, gyroZ);  // Gyroscope values in rad/s
+    glm::vec3 acc(accX, accY, accZ);      // Accelerometer values in m/s²
+
+    // Check if all components of gyro and acc are finite (not NaN or Inf)
+    bool gyroValid1 = std::isfinite(gyro.x) && std::isfinite(gyro.y) && std::isfinite(gyro.z);
+    bool gyroValid2 = !((fabs(gyro.x) < 1e-6)&&(fabs(gyro.y) < 1e-6)&&(fabs(gyro.z) < 1e-6));
+    bool accValid1 = std::isfinite(acc.x) && std::isfinite(acc.y) && std::isfinite(acc.z);
+    bool accValid2 = !((fabs(acc.x) < 1e-6)&&(fabs(acc.y) < 1e-6)&&(fabs(acc.z) < 1e-6));
+    bool gyroValid = gyroValid1&&gyroValid2;
+    bool accValid = accValid1 && accValid2;
+
+    static glm::vec3 gyroData,accData;
+    if (gyroValid)
+    {
+        gyroData = gyro;
+    }
+    if(accValid)
+    {
+        accData = acc;
+    }
+
+    bool gyroDataValid = !((fabs(gyroData.x) < 1e-6)&&(fabs(gyroData.y) < 1e-6)&&(fabs(gyroData.z) < 1e-6));
+    bool accDataValid = !((fabs(accData.x) < 1e-6)&&(fabs(accData.y) < 1e-6)&&(fabs(accData.z) < 1e-6));
+    if(gyroDataValid&&accDataValid){
+        LOGI("gyro and acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
+             gyroData.x, gyroData.y, gyroData.z, accData.x, accData.y, accData.z);
+        ahrs.Update(gyroData, accData);
+    }
+
+//    if (gyroValid && accValid) {
+//        LOGI("gyro or acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
+//             gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z);
+////        ahrs.Update(gyroData, accData);
+//    } else {
+//        LOGE("Invalid gyro or acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
+//             gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z);
+//    }
+
+    glm::vec3 eulerAngles = ahrs.getEulerAngles();
+    float azimuth = eulerAngles.y;  // Yaw
+    float elevation = eulerAngles.x;  // Pitch
+    // Adjust the rotation based on the gyroscope's rate of rotation
+    rotationX = azimuth*180.0f/3.141592653f;
+    rotationY = elevation*180.0f/3.141592653f;
+
+    LOGI("rotationX:%.2f,rotationY:%.2f\n",rotationX,rotationY);
+
+    // Clamp rotationX and rotationY to prevent excessive rotation
+    // rotationX could be clamped to something like [-90, 90] degrees for a "look up/down" effect
+//    rotationX = glm::clamp(rotationX, -90.0f, 90.0f);
+    // rotationY could be cyclic, so no clamping is needed unless you want to restrict movement
+
 }
 
 // Create external texture for video frames
@@ -454,20 +505,13 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeHandlePi
     renderer->handlePinchZoom(scaleFactor);
 }
 
-// 本函数暂时没用到，因为JAVA端无法获取Ffmpeg解码的视频帧数据
+// 处理从 Java 传递来的陀螺仪数据
 JNIEXPORT void JNICALL
-Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeProcessFrame(JNIEnv *env, jobject obj, jlong rendererPtr, jbyteArray yuvData, jint width, jint height){
-    PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
-    if (renderer) {
-        jbyte* yuv = env->GetByteArrayElements(yuvData, nullptr);
-        // 假设YUV数据格式为NV21 (YUV420)
-        cv::Mat yuvFrame(height + height / 2, width, CV_8UC1, yuv);
-
-        // 将YUV转换为RGB格式
-        cv::Mat rgbFrame;
-        cv::cvtColor(yuvFrame, rgbFrame, cv::COLOR_YUV2RGB_NV21);
-        renderer->processFrame(rgbFrame);
-        env->ReleaseByteArrayElements(yuvData, yuv, 0);
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGyroAccUpdate(JNIEnv *env, jobject obj, jlong rendererPtr, jfloat gyroX, jfloat gyroY, jfloat gyroZ,
+                                                                                        jfloat accX,jfloat accY,jfloat accZ) {
+    PanoramaRenderer* renderer = reinterpret_cast<PanoramaRenderer*>(rendererPtr);
+    if (renderer != nullptr) {
+        renderer->onGyroAccUpdate(gyroX, gyroY, gyroZ,accX,accY,accZ);
     }
 }
 
