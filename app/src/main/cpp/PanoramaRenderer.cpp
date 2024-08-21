@@ -265,6 +265,11 @@ void PanoramaRenderer::onSurfaceCreated() {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // 启用深度测试，防止遮挡影响
+    glEnable(GL_DEPTH_TEST);
+    // 设置深度测试函数
+    glDepthFunc(GL_LESS);
     LOGI("onSurfaceCreated have successfully run.\n");
 }
 
@@ -301,8 +306,13 @@ void PanoramaRenderer::onDrawFrame() {
 
     glUseProgram(shaderProgram);
 
-    projection = glm::perspective(glm::radians(55.0f), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
-    view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) * zoom, glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    float fovDeg = 60*zoom;
+    if (fovDeg<30)
+        fovDeg = 30;
+    if (fovDeg>160)
+        fovDeg = 160;
+    projection = glm::perspective(glm::radians(fovDeg), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
+    view = glm::lookAt(glm::vec3(-1.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 0.0f, 1.0f));
     view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
