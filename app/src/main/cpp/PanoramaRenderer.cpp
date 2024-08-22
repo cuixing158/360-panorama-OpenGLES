@@ -301,6 +301,11 @@ void PanoramaRenderer::onSurfaceCreated() {
 void PanoramaRenderer::onDrawFrame() {
     updateVideoFrame();
 
+    unsigned codecVer = avcodec_version();
+    const char *ffmpegVersion = av_version_info(); // 获取FFmpeg版本信息
+
+    LOGI("FFmpeg version is: %s, avcodec version is: %d\n", ffmpegVersion, codecVer);
+
     LOGI("onDrawFrame have successfully initialized.\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
