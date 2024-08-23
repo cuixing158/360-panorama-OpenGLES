@@ -139,6 +139,7 @@ public:
 
 class PanoramaRenderer {
 public:
+    enum View{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
     PanoramaRenderer(AAssetManager* assetManager,std::string filepath);
     ~PanoramaRenderer();
 
@@ -153,7 +154,9 @@ public:
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.
     GLuint createExternalTexture();  // Create external texture for rendering video frames
 
-    static void processDecodedFrameImpl(AVFrame* avFrame);
+    static void processDecodedFrameImpl(AVFrame* avFrame); // android 的bzijkplayer传递过来的AVFrame
+    void processUI(cv::Mat matFrame); // ios 播放器传递过来的cv::frame
+
 private:
     GLuint loadShader(GLenum type, const char *shaderSrc);
     GLuint createProgram(const char *vertexSrc, const char *fragmentSrc);
@@ -188,6 +191,8 @@ private:
     int widthScreen;
     int heightScreen;
 
+    //视角
+    View viewOrientation;
 };
 #endif
 

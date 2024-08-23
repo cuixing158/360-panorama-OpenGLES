@@ -9,6 +9,15 @@ void  processDecodedFrame(AVFrame* avFrame){
     PanoramaRenderer::processDecodedFrameImpl( avFrame);
 }
 
+void PanoramaRenderer::processUI(cv::Mat matFrame){
+    // Lock the textureMutex and update the frame
+    std::lock_guard<std::mutex> lock(textureMutex);
+    cv::Mat img;
+    cv::cvtColor(matFrame,img,cv::COLOR_BGR2RGB);
+    cv::flip(img,img,0);
+    frame = img.clone();
+}
+
  void  PanoramaRenderer::processDecodedFrameImpl(AVFrame* avFrame) {
 // Check if the frame is in a format OpenCV understands
      if (avFrame->format != AV_PIX_FMT_BGR24 && avFrame->format != AV_PIX_FMT_RGB24) {
@@ -60,7 +69,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     : shaderProgram(0), texture(0), videoTexture(0),vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
-    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f){
+    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(PERSPECTIVE){
 
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -301,23 +310,31 @@ void PanoramaRenderer::onSurfaceCreated() {
 void PanoramaRenderer::onDrawFrame() {
     updateVideoFrame();
 
-    unsigned codecVer = avcodec_version();
-    const char *ffmpegVersion = av_version_info(); // 获取FFmpeg版本信息
-
-    LOGI("FFmpeg version is: %s, avcodec version is: %d\n", ffmpegVersion, codecVer);
-
     LOGI("onDrawFrame have successfully initialized.\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shaderProgram);
 
-    float fovDeg = 60*zoom;
-    if (fovDeg<30)
-        fovDeg = 30;
+    float fovDeg= 70*zoom;
+    if (fovDeg<50)
+        fovDeg = 50;
     if (fovDeg>160)
         fovDeg = 160;
+
+    if (viewOrientation==PanoramaRenderer::PERSPECTIVE)
+    {
+        view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }else if(viewOrientation==PanoramaRenderer::LITTLEPLANET)
+    {
+        view = glm::lookAt(glm::vec3(-1.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }else if(viewOrientation==PanoramaRenderer::CRYSTALBALL)
+    {
+        view = glm::lookAt(glm::vec3(-1.5f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }else
+    {
+        view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    }
     projection = glm::perspective(glm::radians(fovDeg), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
-    view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 0.0f, 1.0f));
     view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 
@@ -409,8 +426,8 @@ void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,flo
     float azimuth = eulerAngles.y;  // Yaw
     float elevation = eulerAngles.x;  // Pitch
     // Adjust the rotation based on the gyroscope's rate of rotation
-    rotationX = azimuth*180.0f/3.141592653f;
-    rotationY = elevation*180.0f/3.141592653f;
+//    rotationX = azimuth*180.0f/3.141592653f;
+//    rotationY = elevation*180.0f/3.141592653f;
 
     LOGI("rotationX:%.2f,rotationY:%.2f\n",rotationX,rotationY);
 

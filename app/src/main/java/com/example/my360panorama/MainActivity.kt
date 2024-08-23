@@ -80,7 +80,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
             // Set the Surface to the IJKPlayer
             ijkMediaPlayer.setSurface(surface)
-            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/panorama.mp4" // Your video file path
+            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/360panorama.mp4" // Your video file path
             ijkMediaPlayer.setOnPreparedListener { iMediaPlayer -> iMediaPlayer.start() }
             ijkMediaPlayer.prepareAsync()
 
