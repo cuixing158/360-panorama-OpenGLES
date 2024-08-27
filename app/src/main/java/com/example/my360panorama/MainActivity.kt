@@ -1,22 +1,22 @@
 package com.example.my360panorama
+
 import android.content.Context
 import android.content.res.AssetManager
+import android.graphics.SurfaceTexture
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.opengl.GLSurfaceView
-import android.os.Bundle
-import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.opengl.GLSurfaceView
+import android.os.Bundle
 import android.view.MotionEvent
 import android.view.Surface
 import androidx.appcompat.app.AppCompatActivity
 import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
-
 
 class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var glSurfaceView: GLSurfaceView
@@ -30,10 +30,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var surfaceTexture: SurfaceTexture? = null
     private var surface: Surface? = null
     private var textureID: Int = 0
-    
+
     private lateinit var sensorManager: SensorManager
     private var gyroSensor: Sensor? = null
     private var accSensor: Sensor? = null
+    private var gameRotationVectorSensor: Sensor? = null // Add this line
 
     companion object {
         init {
@@ -60,11 +61,12 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         setContentView(glSurfaceView)
 
         ijkMediaPlayer = IjkMediaPlayer()
-        
+
         // Initialize sensor manager and sensors
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
         accSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        gameRotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) // Add this line
     }
 
     override fun onResume() {
@@ -72,6 +74,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         // Register the sensor listeners
         gyroSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
         accSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
+        gameRotationVectorSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) } // Add this line
 
         try {
             // Initialize the SurfaceTexture and Surface
@@ -101,7 +104,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         ijkMediaPlayer.release()
         surfaceTexture?.release()
         surface?.release()
-           // Unregister the sensor listeners
+        // Unregister the sensor listeners
         sensorManager.unregisterListener(this)
     }
 
@@ -136,7 +139,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-        // Implement sensor event listener methods
+    // Implement sensor event listener methods
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_GYROSCOPE -> {
@@ -153,6 +156,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 // Call native function to pass accelerometer data
                 renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr,0f, 0f, 0f, accX, accY, accZ)
             }
+            Sensor.TYPE_GAME_ROTATION_VECTOR -> {
+                val rotationVector = event.values
+                val quaternion = FloatArray(4)
+                SensorManager.getQuaternionFromVector(quaternion, rotationVector)
+
+                val w = quaternion[0]
+                val x = quaternion[1]
+                val y = quaternion[2]
+                val z = quaternion[3]
+
+                // Call native function to pass quaternion data
+                renderer.nativeOnGameRotationUpdate(renderer.nativeRendererPtr, w, x, y, z)
+            }
         }
     }
 
@@ -165,35 +181,30 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         var nativeRendererPtr: Long
         private var textureID: Int = 0
-        private var surfaceTexture: SurfaceTexture? = null // Add this member variable
+        private var surfaceTexture: SurfaceTexture? = null
 
         init {
             nativeRendererPtr = nativeCreateRenderer(assetManager, path)
             if (nativeRendererPtr == 0L) {
                 throw RuntimeException("Failed to create native renderer")
             }
-            // Initialize the external texture (ID will be returned by native function)
-            textureID = nativeCreateExternalTexture(nativeRendererPtr) // 生成一个外部纹理ID给到kt这边来
-            surfaceTexture = SurfaceTexture(textureID) //
+            textureID = nativeCreateExternalTexture(nativeRendererPtr)
+            surfaceTexture = SurfaceTexture(textureID)
         }
 
         override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-            // Bind the texture and set parameters for external texture
             GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureID)
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MIN_FILTER, GLES20.GL_NEAREST)
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_MAG_FILTER, GLES20.GL_LINEAR)
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_S, GLES20.GL_CLAMP_TO_EDGE)
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_TEXTURE_WRAP_T, GLES20.GL_CLAMP_TO_EDGE)
 
-            // Call native function to set up OpenGL
             nativeOnSurfaceCreated(nativeRendererPtr)
         }
 
         override fun onDrawFrame(gl: GL10?) {
-            // Update the SurfaceTexture with the new video frame
-            surfaceTexture?.updateTexImage() // Ensure this updates the texture
+            surfaceTexture?.updateTexImage()
 
-            // Draw the frame using the native renderer
             nativeOnDrawFrame(nativeRendererPtr)
         }
 
@@ -214,5 +225,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         external fun nativeHandleTouchDrag(rendererPtr: Long, deltaX: Float, deltaY: Float)
         external fun nativeHandlePinchZoom(rendererPtr: Long, scaleFactor: Float)
         external fun nativeOnGyroAccUpdate(rendererPtr: Long,gyroX: Float, gyroY: Float, gyroZ: Float, accX: Float, accY: Float, accZ: Float)
+        external fun nativeOnGameRotationUpdate(rendererPtr: Long, w: Float, x: Float, y: Float, z: Float) // Add this line
     }
 }

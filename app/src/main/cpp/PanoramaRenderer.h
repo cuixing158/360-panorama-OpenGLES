@@ -66,8 +66,8 @@ extern "C" {
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
-#include <glm/gtc/quaternion.hpp>
-//#include <glm/gtx/norm.hpp>
+#define GLM_ENABLE_EXPERIMENTAL
+#include "glm/gtx/quaternion.hpp"
 #endif
 
 
@@ -95,8 +95,8 @@ public:
         // Normalize accelerometer measurement
         glm::vec3 acc = glm::normalize(accelerometer);
 
-        LOGI("gyroscope : (%.6f, %.6f, %.6f)", gyroscope.x, gyroscope.y, gyroscope.z);
-        LOGI("Normalized accelerometer: (%.6f, %.6f, %.6f)", acc.x, acc.y, acc.z);
+//        LOGI("gyroscope : (%.6f, %.6f, %.6f)", gyroscope.x, gyroscope.y, gyroscope.z);
+//        LOGI("Normalized accelerometer: (%.6f, %.6f, %.6f)", acc.x, acc.y, acc.z);
 
         // Gradient descent algorithm corrective step
         glm::vec3 F(
@@ -105,7 +105,7 @@ public:
                 2.0f * (0.5f - quaternion.x * quaternion.x - quaternion.y * quaternion.y) - acc.z
         );
 
-        LOGI("F vector: (%.6f, %.6f, %.6f)", F.x, F.y, F.z);
+//        LOGI("F vector: (%.6f, %.6f, %.6f)", F.x, F.y, F.z);
 
         glm::mat4 J(
                 -2.0f * quaternion.y,  2.0f * quaternion.z, -2.0f * quaternion.w,  2.0f * quaternion.x,
@@ -117,18 +117,18 @@ public:
         glm::vec4 F4 = glm::vec4(F, 0.0f);
         glm::vec4 step4 = glm::normalize(glm::transpose(J) * F4);
 
-        LOGI("Step vector: (%.6f, %.6f, %.6f, %.6f)", step4.x, step4.y, step4.z, step4.w);
+//        LOGI("Step vector: (%.6f, %.6f, %.6f, %.6f)", step4.x, step4.y, step4.z, step4.w);
 
         // Compute rate of change of quaternion
         glm::quat qDot = 0.5f * quaternion * glm::quat(0.0f, gyroscope.x, gyroscope.y, gyroscope.z) - beta * glm::quat(step4);
 
-        LOGI("qDot: (%.6f, %.6f, %.6f, %.6f)", qDot.w, qDot.x, qDot.y, qDot.z);
+//        LOGI("qDot: (%.6f, %.6f, %.6f, %.6f)", qDot.w, qDot.x, qDot.y, qDot.z);
 
         // Integrate to yield quaternion
         quaternion += qDot * samplePeriod;
         quaternion = glm::normalize(quaternion);
 
-        LOGI("Updated quaternion: (%.6f, %.6f, %.6f, %.6f)", quaternion.w, quaternion.x, quaternion.y, quaternion.z);
+//        LOGI("Updated quaternion: (%.6f, %.6f, %.6f, %.6f)", quaternion.w, quaternion.x, quaternion.y, quaternion.z);
     }
 
     glm::vec3 getEulerAngles() const {
@@ -149,7 +149,10 @@ public:
 
     void handleTouchDrag(float deltaX, float deltaY);
     void handlePinchZoom(float scaleFactor);
+
+    // 手机传感器陀螺仪数据
     void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ);
+    void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ);
 
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.
     GLuint createExternalTexture();  // Create external texture for rendering video frames
@@ -182,6 +185,7 @@ private:
     std::string sharePath; // 共享文件夹，具有读写权限, JNI传入
     glm::mat4 projection;
     glm::mat4 view;
+    glm::mat4 gyroMat;
     float rotationX,rotationY,zoom;
 
     // 手机陀螺仪

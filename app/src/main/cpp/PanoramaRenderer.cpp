@@ -69,7 +69,8 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     : shaderProgram(0), texture(0), videoTexture(0),vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
-    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(PERSPECTIVE){
+    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(PERSPECTIVE),
+    view(glm::mat4(1.0)),gyroMat(glm::mat4(1.0)){
 
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -310,7 +311,7 @@ void PanoramaRenderer::onSurfaceCreated() {
 void PanoramaRenderer::onDrawFrame() {
     updateVideoFrame();
 
-    LOGI("onDrawFrame have successfully initialized.\n");
+//    LOGI("onDrawFrame have successfully initialized.\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     glUseProgram(shaderProgram);
@@ -323,20 +324,38 @@ void PanoramaRenderer::onDrawFrame() {
 
     if (viewOrientation==PanoramaRenderer::PERSPECTIVE)
     {
-        view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);  // 摄像机位置
+        glm::vec3 target = glm::vec3(0.0f, 0.0f, -1.0f);    // 目标点
+        glm::vec3 upVector = glm::vec3(0.0f, 1.0f, 0.0f);   // 上向量
+
+        // 旋转目标点和上向量以匹配设备的姿态
+        target = gyroMat * glm::vec4(target,0.0);
+        upVector = gyroMat * glm::vec4(upVector,0.0);
+
+        // 生成视图矩阵
+        view = glm::lookAt(cameraPos , target, upVector);
     }else if(viewOrientation==PanoramaRenderer::LITTLEPLANET)
     {
-        view = glm::lookAt(glm::vec3(-1.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        view = glm::lookAt(glm::vec3(0.0f, 1.0f, 0.0f) , glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
     }else if(viewOrientation==PanoramaRenderer::CRYSTALBALL)
     {
-        view = glm::lookAt(glm::vec3(-1.5f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+        glm::vec3 cameraPos = glm::vec3(0.0f, -1.2f, 0.0f);  // 摄像机位置
+        glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);    // 目标点
+        glm::vec3 upVector = glm::vec3(-1.0f, 1.0f, 0.0f);   // 上向量
+
+        // 旋转目标点和上向量以匹配设备的姿态
+        cameraPos = gyroMat * glm::vec4(cameraPos,0.0);
+        upVector = gyroMat * glm::vec4(upVector,0.0);
+
+        // 生成视图矩阵
+        view = glm::lookAt(cameraPos , target, upVector);
     }else
     {
         view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
     }
     projection = glm::perspective(glm::radians(fovDeg), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
-    view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 0.0f, 1.0f));
-    view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
+    view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 0.0f, 1.0f));
+    view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 1.0f, 0.0f));
 
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
@@ -349,7 +368,6 @@ void PanoramaRenderer::onDrawFrame() {
 //  frame = cv::imread(sharePath+"/dst_videoDecodingLoop.jpg");
     {
         std::unique_lock<std::mutex> lock(textureMutex);
-            LOGI("onDrawFrame, frame.empty():%d\n", frame.empty());
             if (!frame.empty()) {
                 //cv::imwrite(sharePath + "/dst_ondrawFrame.jpg", frame);
                 glBindTexture(GL_TEXTURE_2D, videoTexture);
@@ -361,21 +379,20 @@ void PanoramaRenderer::onDrawFrame() {
 //    glBindTexture(GL_TEXTURE_2D, texture);// 全景图像使用
     glDrawElements(GL_TRIANGLES, sphereData->getNumIndices(), GL_UNSIGNED_SHORT, 0);
     glBindVertexArray(0);  // Unbind VAO
-    LOGI("onDrawFrame have successfully run.\n");
+//    LOGI("onDrawFrame have successfully run.\n");
 }
 
 void PanoramaRenderer::onSurfaceChanged(int width, int height) {
-    LOGI("onSurfaceChanged have successfully initialized.\n");
-//    GLsizei len = std::min({width,height});
+//    LOGI("onSurfaceChanged have successfully initialized.\n");
     widthScreen = width;
     heightScreen = height;
     glViewport(0, 0, width,height);
-    LOGI("onSurfaceChanged have successfully run.\n");
+//    LOGI("onSurfaceChanged have successfully run.\n");
 }
 
 void PanoramaRenderer::handleTouchDrag(float deltaX, float deltaY) {
-    rotationY += deltaX * 0.1f;
-    rotationX += deltaY * 0.1f;
+    rotationX += deltaX * 0.1f;
+    rotationY += deltaY * 0.1f;
 }
 
 void PanoramaRenderer::handlePinchZoom(float scaleFactor) {
@@ -408,8 +425,8 @@ void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,flo
     bool gyroDataValid = !((fabs(gyroData.x) < 1e-6)&&(fabs(gyroData.y) < 1e-6)&&(fabs(gyroData.z) < 1e-6));
     bool accDataValid = !((fabs(accData.x) < 1e-6)&&(fabs(accData.y) < 1e-6)&&(fabs(accData.z) < 1e-6));
     if(gyroDataValid&&accDataValid){
-        LOGI("gyro and acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
-             gyroData.x, gyroData.y, gyroData.z, accData.x, accData.y, accData.z);
+//        LOGI("gyro and acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
+//             gyroData.x, gyroData.y, gyroData.z, accData.x, accData.y, accData.z);
         ahrs.Update(gyroData, accData);
     }
 
@@ -429,12 +446,55 @@ void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,flo
 //    rotationX = azimuth*180.0f/3.141592653f;
 //    rotationY = elevation*180.0f/3.141592653f;
 
-    LOGI("rotationX:%.2f,rotationY:%.2f\n",rotationX,rotationY);
+//    LOGI("rotationX:%.2f,rotationY:%.2f\n",rotationX,rotationY);
 
     // Clamp rotationX and rotationY to prevent excessive rotation
     // rotationX could be clamped to something like [-90, 90] degrees for a "look up/down" effect
 //    rotationX = glm::clamp(rotationX, -90.0f, 90.0f);
     // rotationY could be cyclic, so no clamping is needed unless you want to restrict movement
+
+}
+
+void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ){
+
+    // 创建四元数
+    glm::quat quaternion(quatW, quatX, quatY, quatZ);
+
+    // 将四元数转换为欧拉角
+    glm::vec3 eulerAngles = glm::eulerAngles(quaternion);
+    glm::vec3 degreeAngles= glm::degrees(eulerAngles);
+
+    LOGI("-------------------------------------\n");
+    LOGI("quaternion degree:%.2f,%.2f,%.2f\n",degreeAngles[0],degreeAngles[1],degreeAngles[2]);
+
+
+// 将四元数转换为旋转矩阵
+    gyroMat = glm::toMat4(quaternion);
+
+    // 输出结果
+    LOGI("gyroMat Before Matrix:");
+    LOGI("[ ");
+    for (int i = 0; i < 4; ++i) {
+        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
+    }
+    LOGI("]\n") ;
+    gyroMat = glm::rotate(gyroMat,glm::radians(360.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+
+    LOGI("gyroMat After Matrix:");
+    LOGI("[ ");
+    for (int i = 0; i < 4; ++i) {
+        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
+    }
+    LOGI("]\n") ;
+//    gyroMat = glm::rotate(gyroMat,glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+// 计算欧拉角
+    eulerAngles.x = atan2(gyroMat[2][1], gyroMat[2][2]); // 绕X轴的旋转
+    eulerAngles.y = atan2(-gyroMat[2][0], sqrt(gyroMat[2][1] * gyroMat[2][1] + gyroMat[2][2] * gyroMat[2][2])); // 绕Y轴的旋转
+    eulerAngles.z = atan2(gyroMat[1][0], gyroMat[0][0]); // 绕Z轴的旋转
+    degreeAngles= glm::degrees(eulerAngles);
+    LOGI("rotationmatrix degree:%.2f,%.2f,%.2f\n",degreeAngles[0],degreeAngles[1],degreeAngles[2]);
+
 
 }
 
@@ -537,4 +597,13 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGyroAc
     }
 }
 
+// 处理从 Java 传递来的陀螺仪数据，直接调用JAVA已经融合好的四元数
+JNIEXPORT void JNICALL
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGameRotationUpdate(JNIEnv *env, jobject obj, jlong rendererPtr, jfloat quatW, jfloat quatX, jfloat quatY,
+                                                                                        jfloat quatZ) {
+    PanoramaRenderer* renderer = reinterpret_cast<PanoramaRenderer*>(rendererPtr);
+    if (renderer != nullptr) {
+        renderer->onQuaternionUpdate(quatW,quatX,quatY,quatZ);
+    }
+    }
 }
