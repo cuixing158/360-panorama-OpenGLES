@@ -139,7 +139,9 @@ public:
 
 class PanoramaRenderer {
 public:
-    enum View{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
+    enum ViewMode{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
+    enum GyroMode{GYRODISABLED,GYROENABLED}; // 是否开启陀螺仪
+
     PanoramaRenderer(AAssetManager* assetManager,std::string filepath);
     ~PanoramaRenderer();
 
@@ -151,14 +153,17 @@ public:
     void handlePinchZoom(float scaleFactor);
 
     // 手机传感器陀螺仪数据
+    void setViewMode(ViewMode mode);
+    void setGyroMode(GyroMode mode);
     void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ);
     void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ);
 
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.
     GLuint createExternalTexture();  // Create external texture for rendering video frames
 
+    // 用于IJKplayer传入进来的帧
     static void processDecodedFrameImpl(AVFrame* avFrame); // android 的bzijkplayer传递过来的AVFrame
-    void processUI(cv::Mat matFrame); // ios 播放器传递过来的cv::frame
+    void processUI(cv::Mat& matFrame); // ios 播放器传递过来的cv::frame
 
 private:
     GLuint loadShader(GLenum type, const char *shaderSrc);
@@ -187,6 +192,8 @@ private:
     glm::mat4 view;
     glm::mat4 gyroMat;
     float rotationX,rotationY,zoom;
+    ViewMode viewOrientation; // 透视图，小行星，水晶球
+    GyroMode gyroOpen; // 是否开启陀螺仪
 
     // 手机陀螺仪
     MadgwickAHRS ahrs;
@@ -194,9 +201,6 @@ private:
     // 播放屏幕宽和高尺寸
     int widthScreen;
     int heightScreen;
-
-    //视角
-    View viewOrientation;
 };
 #endif
 

@@ -9,7 +9,7 @@ void  processDecodedFrame(AVFrame* avFrame){
     PanoramaRenderer::processDecodedFrameImpl( avFrame);
 }
 
-void PanoramaRenderer::processUI(cv::Mat matFrame){
+void PanoramaRenderer::processUI(cv::Mat& matFrame){
     // Lock the textureMutex and update the frame
     std::lock_guard<std::mutex> lock(textureMutex);
     cv::Mat img;
@@ -69,12 +69,23 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     : shaderProgram(0), texture(0), videoTexture(0),vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
-    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(PERSPECTIVE),
+    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(PERSPECTIVE),gyroOpen(GYRODISABLED),
     view(glm::mat4(1.0)),gyroMat(glm::mat4(1.0)){
 
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);
+
+    if(viewOrientation==PanoramaRenderer::ViewMode::PERSPECTIVE){
+            zoom = 1;
+    }else if(viewOrientation==PanoramaRenderer::ViewMode::LITTLEPLANET){
+            zoom=2;
+    }else if(viewOrientation==PanoramaRenderer::ViewMode::CRYSTALBALL){
+            zoom=2;
+    }else{
+       zoom = 1;
+    }
+
 }
 
 PanoramaRenderer::~PanoramaRenderer() {
@@ -310,10 +321,8 @@ void PanoramaRenderer::onSurfaceCreated() {
 
 void PanoramaRenderer::onDrawFrame() {
     updateVideoFrame();
-
 //    LOGI("onDrawFrame have successfully initialized.\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
     glUseProgram(shaderProgram);
 
     float fovDeg= 70*zoom;
@@ -322,44 +331,47 @@ void PanoramaRenderer::onDrawFrame() {
     if (fovDeg>160)
         fovDeg = 160;
 
-    if (viewOrientation==PanoramaRenderer::PERSPECTIVE)
-    {
-        glm::vec3 cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);  // 摄像机位置
-        glm::vec3 target = glm::vec3(0.0f, 0.0f, -1.0f);    // 目标点
-        glm::vec3 upVector = glm::vec3(0.0f, 1.0f, 0.0f);   // 上向量
-
-        // 旋转目标点和上向量以匹配设备的姿态
-        target = gyroMat * glm::vec4(target,0.0);
-        upVector = gyroMat * glm::vec4(upVector,0.0);
-
-        // 生成视图矩阵
-        view = glm::lookAt(cameraPos , target, upVector);
-    }else if(viewOrientation==PanoramaRenderer::LITTLEPLANET)
-    {
-        view = glm::lookAt(glm::vec3(0.0f, 1.0f, 0.0f) , glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f));
-    }else if(viewOrientation==PanoramaRenderer::CRYSTALBALL)
-    {
-        glm::vec3 cameraPos = glm::vec3(0.0f, -1.2f, 0.0f);  // 摄像机位置
-        glm::vec3 target = glm::vec3(0.0f, 0.0f, 0.0f);    // 目标点
-        glm::vec3 upVector = glm::vec3(-1.0f, 1.0f, 0.0f);   // 上向量
-
-        // 旋转目标点和上向量以匹配设备的姿态
-        cameraPos = gyroMat * glm::vec4(cameraPos,0.0);
-        upVector = gyroMat * glm::vec4(upVector,0.0);
-
-        // 生成视图矩阵
-        view = glm::lookAt(cameraPos , target, upVector);
-    }else
-    {
-        view = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f) , glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    glm::vec3 cameraPos,target,upVector;
+    glm::vec3 viewDir,upDir;
+    if (viewOrientation==PanoramaRenderer::ViewMode::PERSPECTIVE){
+        cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);  // 摄像机位置
+        target = glm::vec3(0.0f, 0.0f, -1.0f);    // 目标点
+        upVector = glm::vec3(0.0f, 1.0f, 0.0f);   // 上向量
+    }else if(viewOrientation==PanoramaRenderer::ViewMode::LITTLEPLANET){
+        cameraPos = glm::vec3(0.0f, 1.0f, 0.0f);
+        target = glm::vec3(0.0f, 0.0f, 0.0f);
+        upVector = glm::vec3(-1.0f, 0.0f, 0.0f);
+    }else if(viewOrientation==PanoramaRenderer::ViewMode::CRYSTALBALL){
+        cameraPos = glm::vec3(0.0f, -1.2f, 0.0f);
+        target = glm::vec3(0.0f, 0.0f, 0.0f);
+        upVector = glm::vec3(-1.0f, 1.0f, 0.0f);
+    }else{
+        cameraPos = glm::vec3(0.0f, 0.0f, 0.0f);
+        target = glm::vec3(0.0f, 0.0f, -1.0f);
+        upVector = glm::vec3(0.0f, 1.0f, 0.0f);
     }
-    projection = glm::perspective(glm::radians(fovDeg), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
-    view = glm::rotate(view, glm::radians(rotationY), glm::vec3(0.0f, 0.0f, 1.0f));
-    view = glm::rotate(view, glm::radians(rotationX), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    if(gyroOpen==PanoramaRenderer::GyroMode::GYROENABLED){
+        target = glm::vec3(gyroMat * glm::vec4(target, 1.0));
+        upVector = glm::vec3(gyroMat * glm::vec4(upVector, 0.0));
+    }
+
+    viewDir = glm::normalize(target - cameraPos);
+    upDir = glm::normalize(upVector);
+
+    // 生成视图矩阵
+    view = glm::lookAt(cameraPos, target, upVector);
+
+    if(gyroOpen==PanoramaRenderer::GyroMode::GYRODISABLED){
+        glm::vec3 rotateAxis = glm::normalize(glm::cross(viewDir, upDir));
+        view = glm::rotate(view, glm::radians(rotationY), rotateAxis); // 绕cameraPos中心旋转
+        view = glm::rotate(view, glm::radians(rotationX), upDir);
+    }
 
     GLuint projLoc = glGetUniformLocation(shaderProgram, "projection");
     GLuint viewLoc = glGetUniformLocation(shaderProgram, "view");
 
+    projection = glm::perspective(glm::radians(fovDeg), (float)widthScreen / (float)heightScreen, 0.1f, 100.0f);
     glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
@@ -397,6 +409,14 @@ void PanoramaRenderer::handleTouchDrag(float deltaX, float deltaY) {
 
 void PanoramaRenderer::handlePinchZoom(float scaleFactor) {
     zoom *= scaleFactor;
+}
+
+void PanoramaRenderer::setViewMode(ViewMode mode){
+    viewOrientation = mode;
+}
+
+void PanoramaRenderer::setGyroMode(GyroMode mode){
+    gyroOpen = mode;
 }
 
 void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ){
@@ -472,28 +492,21 @@ void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY,
     gyroMat = glm::toMat4(quaternion);
 
     // 输出结果
-    LOGI("gyroMat Before Matrix:");
-    LOGI("[ ");
-    for (int i = 0; i < 4; ++i) {
-        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
-    }
-    LOGI("]\n") ;
-    gyroMat = glm::rotate(gyroMat,glm::radians(360.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-
-    LOGI("gyroMat After Matrix:");
-    LOGI("[ ");
-    for (int i = 0; i < 4; ++i) {
-        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
-    }
-    LOGI("]\n") ;
+//    LOGI("gyroMat Before Matrix:");
+////    LOGI("[ ");
+////    for (int i = 0; i < 4; ++i) {
+////        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
+////    }
+////    LOGI("]\n") ;
+//    gyroMat = glm::rotate(gyroMat,glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 //    gyroMat = glm::rotate(gyroMat,glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
 // 计算欧拉角
-    eulerAngles.x = atan2(gyroMat[2][1], gyroMat[2][2]); // 绕X轴的旋转
-    eulerAngles.y = atan2(-gyroMat[2][0], sqrt(gyroMat[2][1] * gyroMat[2][1] + gyroMat[2][2] * gyroMat[2][2])); // 绕Y轴的旋转
-    eulerAngles.z = atan2(gyroMat[1][0], gyroMat[0][0]); // 绕Z轴的旋转
-    degreeAngles= glm::degrees(eulerAngles);
-    LOGI("rotationmatrix degree:%.2f,%.2f,%.2f\n",degreeAngles[0],degreeAngles[1],degreeAngles[2]);
+//    eulerAngles.x = atan2(gyroMat[2][1], gyroMat[2][2]); // 绕X轴的旋转
+//    eulerAngles.y = atan2(-gyroMat[2][0], sqrt(gyroMat[2][1] * gyroMat[2][1] + gyroMat[2][2] * gyroMat[2][2])); // 绕Y轴的旋转
+//    eulerAngles.z = atan2(gyroMat[1][0], gyroMat[0][0]); // 绕Z轴的旋转
+//    degreeAngles= glm::degrees(eulerAngles);
+//    LOGI("rotationmatrix degree:%.2f,%.2f,%.2f\n",degreeAngles[0],degreeAngles[1],degreeAngles[2]);
 
 
 }
