@@ -81,6 +81,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             surfaceTexture = renderer.createSurfaceTexture()
             surface = Surface(surfaceTexture)
 
+            // IjkMediaPlayer 时启用硬件解码器,避免警告 YUV420P转RGB
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1)
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
+
             // Set the Surface to the IJKPlayer
             ijkMediaPlayer.setSurface(surface)
             ijkMediaPlayer.dataSource = filesDir.absolutePath + "/360panorama.mp4" // Your video file path

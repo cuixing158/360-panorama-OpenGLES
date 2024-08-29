@@ -70,7 +70,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
     widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(ViewMode::PERSPECTIVE),
-    gyroOpen(GyroMode::GYRODISABLED),panoMode(SwitchMode::PANORAMAIMAGE),view(glm::mat4(1.0)),gyroMat(glm::mat4(1.0)){
+    gyroOpen(GyroMode::GYROENABLED),panoMode(SwitchMode::PANORAMAIMAGE),view(glm::mat4(1.0)),gyroMat(glm::mat4(1.0)){
 
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
