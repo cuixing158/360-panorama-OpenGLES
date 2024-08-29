@@ -139,8 +139,9 @@ public:
 
 class PanoramaRenderer {
 public:
-    enum ViewMode{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
-    enum GyroMode{GYRODISABLED,GYROENABLED}; // 是否开启陀螺仪
+    enum class SwitchMode{PANORAMAVIDEO,PANORAMAIMAGE}; //全景视频，全景图像
+    enum class ViewMode{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
+    enum class GyroMode{GYRODISABLED,GYROENABLED}; // 是否开启陀螺仪
 
     PanoramaRenderer(AAssetManager* assetManager,std::string filepath);
     ~PanoramaRenderer();
@@ -152,9 +153,11 @@ public:
     void handleTouchDrag(float deltaX, float deltaY);
     void handlePinchZoom(float scaleFactor);
 
-    // 手机传感器陀螺仪数据
+    // 留给安卓，IOS上层调用
+    void setSwitchMode(SwitchMode mode);
     void setViewMode(ViewMode mode);
     void setGyroMode(GyroMode mode);
+
     void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ);
     void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ);
 
@@ -173,7 +176,7 @@ private:
 
 
     // 全景图像需要的函数
-    GLuint loadTexture(const char *assetPath);
+    static GLuint loadTexture(const char *imagePath);
 
     // 全景图片和视频渲染
     GLuint shaderProgram;
@@ -194,6 +197,7 @@ private:
     float rotationX,rotationY,zoom;
     ViewMode viewOrientation; // 透视图，小行星，水晶球
     GyroMode gyroOpen; // 是否开启陀螺仪
+    SwitchMode panoMode; // 全景视频，全景图像切换
 
     // 手机陀螺仪
     MadgwickAHRS ahrs;

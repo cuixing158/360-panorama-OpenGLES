@@ -69,8 +69,8 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager,std::string filep
     : shaderProgram(0), texture(0), videoTexture(0),vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager),
     sharePath(std::move(filepath)),rotationX(0.0f), rotationY(0.0f), zoom(1.0f) ,
-    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(PERSPECTIVE),gyroOpen(GYRODISABLED),
-    view(glm::mat4(1.0)),gyroMat(glm::mat4(1.0)){
+    widthScreen(800),heightScreen(800),ahrs(1.0f/60.0f),viewOrientation(ViewMode::PERSPECTIVE),
+    gyroOpen(GyroMode::GYRODISABLED),panoMode(SwitchMode::PANORAMAIMAGE),view(glm::mat4(1.0)),gyroMat(glm::mat4(1.0)){
 
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -164,22 +164,9 @@ GLuint PanoramaRenderer::createProgram(const char *vertexSrc, const char *fragme
 }
 
 // 全景图像需要的函数
-GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
-    AAsset *asset = AAssetManager_open(assetManager, assetPath, AASSET_MODE_STREAMING);
-    if (!asset) {
-        LOGE("Failed to open asset %s", assetPath);
-        return 0;
-    }
-
-    off_t assetLength = AAsset_getLength(asset);
-    std::vector<unsigned char> fileData(assetLength);
-
-    AAsset_read(asset, fileData.data(), assetLength);
-    AAsset_close(asset);
-
+GLuint PanoramaRenderer::loadTexture(const char *imagePath) {
     int width, height, nrChannels;
-    // Decode the image using OpenCV
-    cv::Mat img = cv::imdecode(fileData, cv::IMREAD_COLOR);
+    cv::Mat img = cv::imread(imagePath, cv::IMREAD_COLOR);
     if (img.empty()) {
         LOGE("Failed to load texture image from asset");
         return 0;
@@ -193,8 +180,6 @@ GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
     cv::flip(img, img, 0);
     width = img.cols;
     height  = img.rows;
-//    bool issave = cv::imwrite(sharePath+"/AAA.jpg",img);
-//    LOGE("IS save:%d\n",issave);
 
     GLuint texture;
     glGenTextures(1, &texture);
@@ -210,8 +195,6 @@ GLuint PanoramaRenderer::loadTexture(const char *assetPath) {
 
     return texture;
 }
-
-
 
 void PanoramaRenderer::onSurfaceCreated() {
     LOGI("onSurfaceCreated have successfully Initialized.\n");
@@ -265,27 +248,27 @@ void PanoramaRenderer::onSurfaceCreated() {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vboIndices);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphereData->getNumIndices() * sizeof(GLushort), sphereData->getIndices(), GL_STATIC_DRAW);
 
-    ////////////////// 360全景图像////////////////////////////////////////////
-    // texture = loadTexture("360panorama.jpg");
-    // if (!texture) {
-    //     LOGE("Failed to load texture");
-    //     return;
-    // }
-    // glBindBuffer(GL_ARRAY_BUFFER, 0);// 解绑 VBO,360全景图像最好需要
-    // glBindVertexArray(0); // 解绑VAO,360全景图像最好需要
-    // glEnable(GL_DEPTH_TEST);//360全景图像最好需要
-    //////////////////end of 360全景图像////////////////////////////////////////////
+    if(panoMode==SwitchMode::PANORAMAIMAGE){
+        std::string imagePath = sharePath+"/360panorama.jpg";
+        texture = loadTexture(imagePath.c_str());
+        if (!texture) {
+            LOGE("Failed to load texture");
+            return;
+        }
+        glBindBuffer(GL_ARRAY_BUFFER, 0);// 解绑 VBO,360全景图像最好需要
+        glBindVertexArray(0); // 解绑VAO,360全景图像最好需要
+        glGenerateMipmap(GL_TEXTURE_2D); //全景图像使用，但是视频渲染不使用 glGenerateMipmap,较少性能开销
+    }else if(panoMode==SwitchMode::PANORAMAVIDEO){
+        glGenTextures(1, &videoTexture);
+        glBindTexture(GL_TEXTURE_2D, videoTexture);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight,
+                     0, GL_RGB, GL_UNSIGNED_BYTE,nullptr);
 
-    glGenTextures(1, &videoTexture);
-    glBindTexture(GL_TEXTURE_2D, videoTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight,
-                 0, GL_RGB, GL_UNSIGNED_BYTE,nullptr);
-    //glGenerateMipmap(GL_TEXTURE_2D); //全景图像使用，但是视频渲染不使用 glGenerateMipmap,较少性能开销
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
 
     // 启用深度测试，防止遮挡影响
     glEnable(GL_DEPTH_TEST);
@@ -320,7 +303,7 @@ void PanoramaRenderer::onSurfaceCreated() {
 //}
 
 void PanoramaRenderer::onDrawFrame() {
-    updateVideoFrame();
+
 //    LOGI("onDrawFrame have successfully initialized.\n");
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glUseProgram(shaderProgram);
@@ -376,9 +359,12 @@ void PanoramaRenderer::onDrawFrame() {
     glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
     glBindVertexArray(vao);
-    // 视频渲染
-//  frame = cv::imread(sharePath+"/dst_videoDecodingLoop.jpg");
-    {
+
+    if(panoMode==SwitchMode::PANORAMAIMAGE) {
+        glActiveTexture(GL_TEXTURE0);  // 全景图像使用
+        glBindTexture(GL_TEXTURE_2D, texture);// 全景图像使用
+    }else if(panoMode==SwitchMode::PANORAMAVIDEO){
+        updateVideoFrame();
         std::unique_lock<std::mutex> lock(textureMutex);
             if (!frame.empty()) {
                 //cv::imwrite(sharePath + "/dst_ondrawFrame.jpg", frame);
@@ -387,8 +373,6 @@ void PanoramaRenderer::onDrawFrame() {
             }
     }
 
-    //    glActiveTexture(GL_TEXTURE0);  // 全景图像使用
-//    glBindTexture(GL_TEXTURE_2D, texture);// 全景图像使用
     glDrawElements(GL_TRIANGLES, sphereData->getNumIndices(), GL_UNSIGNED_SHORT, 0);
     glBindVertexArray(0);  // Unbind VAO
 //    LOGI("onDrawFrame have successfully run.\n");
@@ -409,6 +393,10 @@ void PanoramaRenderer::handleTouchDrag(float deltaX, float deltaY) {
 
 void PanoramaRenderer::handlePinchZoom(float scaleFactor) {
     zoom *= scaleFactor;
+}
+
+void PanoramaRenderer::setSwitchMode(SwitchMode mode){
+    panoMode = mode;
 }
 
 void PanoramaRenderer::setViewMode(ViewMode mode){
