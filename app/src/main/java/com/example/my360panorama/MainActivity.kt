@@ -81,10 +81,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             surfaceTexture = renderer.createSurfaceTexture()
             surface = Surface(surfaceTexture)
 
-            // IjkMediaPlayer 时启用硬件解码器,避免警告 YUV420P转RGB
-            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
-            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1)
-            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
+//            // IjkMediaPlayer 时启用硬件解码器,避免警告 YUV420P转RGB，但会影响图像显示，实测下面3句没有图像显示
+//            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec", 1)
+//            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-auto-rotate", 1)
+//            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "mediacodec-handle-resolution-change", 1)
 
             // Set the Surface to the IJKPlayer
             ijkMediaPlayer.setSurface(surface)
