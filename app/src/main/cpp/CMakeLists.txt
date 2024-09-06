@@ -330,7 +330,7 @@ find_library(OpenSLES_LIB OpenSLES)
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
         stb_image.h
-        PanoramaRenderer.cpp Sphere.cpp)
+        PanoramaRenderer.cpp Sphere.cpp dualFisheyeSticher.cpp)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR})

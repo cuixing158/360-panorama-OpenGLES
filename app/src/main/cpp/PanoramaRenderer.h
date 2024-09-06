@@ -7,6 +7,7 @@
 #ifdef __cplusplus
 #include "opencv2/opencv.hpp"
 #include "Sphere.h"
+#include "dualFisheyeSticher.hpp"
 #endif
 
 
