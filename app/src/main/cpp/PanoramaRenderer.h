@@ -206,6 +206,9 @@ private:
     // 播放屏幕宽和高尺寸
     int widthScreen;
     int heightScreen;
+
+    // 360全景拼接
+    panorama::DualFisheyeSticher *sticher;
 };
 #endif
 

@@ -201,6 +201,7 @@ if (${ANDROID_ABI} STREQUAL armeabi-v7a)
             ${armeabi_v7a_sources}
             PanoramaRenderer.cpp
             Sphere.cpp
+            dualFisheyeSticher.cpp
     )
 else ()
     add_library( # Sets the name of the library.
@@ -210,6 +211,7 @@ else ()
             ${arm64_v8a_sources}
             PanoramaRenderer.cpp
             Sphere.cpp
+            dualFisheyeSticher.cpp
     )
 endif ()
 
@@ -329,8 +331,8 @@ find_library(OpenSLES_LIB OpenSLES)
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        stb_image.h
-        PanoramaRenderer.cpp Sphere.cpp dualFisheyeSticher.cpp)
+        stb_image.h dualFisheyeSticher.cpp
+        PanoramaRenderer.cpp Sphere.cpp)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR})
