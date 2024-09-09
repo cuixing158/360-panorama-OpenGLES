@@ -68,7 +68,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
     : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager), sharePath(std::move(filepath)),
     rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f),
-    viewOrientation(ViewMode::PERSPECTIVE), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAVIDEO),
+    viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAVIDEO),
     view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -77,7 +77,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
     // 360 全景拼接初始化,下面参数适合insta360 设备的
     panorama::cameraParam cam1, cam2;
     cv::Size outputSize = cv::Size(2000, 1000);
-    float hemisphereWidth = 960.0f; //
+    float hemisphereWidth = 2880.0f; //OBS推流是960.0f
     cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 前单个球
     cam1.FOV = 189.2357;
     cam1.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
