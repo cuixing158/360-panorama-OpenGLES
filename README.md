@@ -4,6 +4,17 @@
 
 *本项目中的ffmpeg预编译so库来源于仓库<https://github.com/bookzhan/bzijkPlayer>,较新的ffmpeg预编译库可以参考 <https://github.com/xufuji456/FFmpegAndroid>，但目前集成新的较为困难，依旧使用的是bzijkplayer*
 
+bzijkPlayer版本：
+
+===== versions =====
+ijkplayer    : 0.8.8
+FFmpeg       : ff3.4--ijk0.8.7--20180103--001
+libavutil    : 55.78.100
+libavcodec   : 57.107.100
+libavformat  : 57.83.100
+libswscale   : 4.8.100
+libswresample: 2.9.100
+
 ---
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
 
@@ -40,9 +51,8 @@
 |IOS APP|Insta360™ App|开发中|完成了3种基础模式及手动切换|
 |桌面Studio|Insta360™ Studio|暂无|是否对标？需要开发Windows或者mac os的程序|
 
-
- **对于APP的实现视频的变速、视角变换、裁剪、音量调节、多段拼接、滤镜、调色均可以实现**   
- **insta360有涉及到AI视频编辑，这个功能首个版本暂时不考虑开发，为了产品快速上线** 
+ **对于APP的实现视频的变速、视角变换、裁剪、音量调节、多段拼接、滤镜、调色均可以实现**
+ **insta360有涉及到AI视频编辑，这个功能首个版本暂时不考虑开发，为了产品快速上线**
 
 上述软件包含以下各种功能细节对标：
 

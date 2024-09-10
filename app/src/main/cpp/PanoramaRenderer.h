@@ -137,7 +137,6 @@ public:
     }
 };
 
-
 class PanoramaRenderer {
 public:
     enum class SwitchMode{PANORAMAVIDEO,PANORAMAIMAGE}; //全景视频，全景图像
@@ -175,7 +174,6 @@ private:
 
     void updateVideoFrame();  // Update texture with video frame from SurfaceTexture
 
-
     // 全景图像需要的函数
     static GLuint loadTexture(const char *imagePath);
 
@@ -206,9 +204,6 @@ private:
     // 播放屏幕宽和高尺寸
     int widthScreen;
     int heightScreen;
-
-    // 360全景拼接
-    panorama::DualFisheyeSticher *sticher;
 };
 #endif
 

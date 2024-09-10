@@ -3,6 +3,33 @@
 // 钩子函数，从ff_ffplay.c中执行
 cv::Mat PanoramaRenderer::frame;
 std::mutex PanoramaRenderer::textureMutex;
+panorama::DualFisheyeSticher initializeSticher();
+panorama::DualFisheyeSticher sticher = initializeSticher();
+
+panorama::DualFisheyeSticher initializeSticher(){
+// 360 全景拼接初始化,下面参数适合insta360 设备的
+    panorama::cameraParam cam1, cam2;
+    cv::Size outputSize = cv::Size(2000, 1000);
+    float hemisphereWidth = 2880.0f; //OBS推流是960.0f
+    cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 前单个球
+    cam1.FOV = 189.2357;
+    cam1.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
+    cam1.radius = hemisphereWidth / 2.0;
+    cam1.rotateX = 0.01112242;
+    cam1.rotateY = 0.2971962;
+    cam1.rotateZ = -0.0007757799;
+
+// cam2
+    cam2.circleFisheyeImage =  cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 后单个球;
+    cam2.FOV = 194.1712;
+    cam2.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
+    cam2.radius = hemisphereWidth / 2.0;
+    cam2.rotateX = -0.7172632;
+    cam2.rotateY = 0.5694329;
+    cam2.rotateZ = 179.9732;
+    panorama::DualFisheyeSticher sticher = panorama::DualFisheyeSticher(cam1, cam2, outputSize);
+    return sticher;
+}
 
 void processDecodedFrame(AVFrame *avFrame) {
     PanoramaRenderer::processDecodedFrameImpl(avFrame);
@@ -11,10 +38,17 @@ void processDecodedFrame(AVFrame *avFrame) {
 void PanoramaRenderer::processUI(cv::Mat &matFrame) {
     // Lock the textureMutex and update the frame
     std::lock_guard<std::mutex> lock(textureMutex);
-    cv::Mat img;
-    cv::cvtColor(matFrame, img, cv::COLOR_BGR2RGB);
-    cv::flip(img, img, 0);
-    frame = img.clone();
+    {
+        cv::Mat img;
+        cv::cvtColor(matFrame, img, cv::COLOR_BGR2RGB);
+        cv::flip(img, img, 0);
+        frame = img.clone();
+
+        // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
+        cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
+        cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
+        frame = sticher.stich(frontFrame,backFrame);
+    }
 }
 
 void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
@@ -45,6 +79,14 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
             cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
             cv::flip(img, img, 0);
             frame = img.clone();
+
+            // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
+            cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
+            cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
+            frame = sticher.stich(frontFrame,backFrame);
+        //    cv::imwrite(sharePath+"/dst_stich_front.jpg",frontFrame);
+        //    cv::imwrite(sharePath+"/dst_stich_back.jpg",backFrame);
+        //    cv::imwrite(sharePath+"/dst_stich.jpg",frame);
         }
 
         // Free resources
@@ -60,6 +102,10 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
             cv::cvtColor(img, img, cv::COLOR_BGR2RGB);
             cv::flip(img, img, 0);
             frame = img.clone();
+
+            cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
+            cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
+            frame = sticher.stich(frontFrame,backFrame);
         }
     }
 }
@@ -74,28 +120,6 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);
 
-    // 360 全景拼接初始化,下面参数适合insta360 设备的
-    panorama::cameraParam cam1, cam2;
-    cv::Size outputSize = cv::Size(2000, 1000);
-    float hemisphereWidth = 2880.0f; //OBS推流是960.0f
-    cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 前单个球
-    cam1.FOV = 189.2357;
-    cam1.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
-    cam1.radius = hemisphereWidth / 2.0;
-    cam1.rotateX = 0.01112242;
-    cam1.rotateY = 0.2971962;
-    cam1.rotateZ = -0.0007757799;
-
-    // cam2
-    cam2.circleFisheyeImage =  cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 后单个球;
-    cam2.FOV = 194.1712;
-    cam2.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
-    cam2.radius = hemisphereWidth / 2.0;
-    cam2.rotateX = -0.7172632;
-    cam2.rotateY = 0.5694329;
-    cam2.rotateZ = 179.9732;
-    sticher = new panorama::DualFisheyeSticher(cam1, cam2, outputSize);
-
     if (viewOrientation == PanoramaRenderer::ViewMode::PERSPECTIVE) {
         zoom = 1;
     } else if (viewOrientation == PanoramaRenderer::ViewMode::LITTLEPLANET) {
@@ -108,7 +132,6 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
 }
 
 PanoramaRenderer::~PanoramaRenderer() {
-    delete sticher;
     delete sphereData;
     glDeleteProgram(shaderProgram);
     glDeleteTextures(1, &texture);
@@ -485,8 +508,8 @@ void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY,
     glm::vec3 eulerAngles = glm::eulerAngles(quaternion);
     glm::vec3 degreeAngles = glm::degrees(eulerAngles);
 
-    LOGI("-------------------------------------\n");
-    LOGI("quaternion degree:%.2f,%.2f,%.2f\n", degreeAngles[0], degreeAngles[1], degreeAngles[2]);
+//    LOGI("-------------------------------------\n");
+//    LOGI("quaternion degree:%.2f,%.2f,%.2f\n", degreeAngles[0], degreeAngles[1], degreeAngles[2]);
 
     // 将四元数转换为旋转矩阵
     gyroMat = glm::toMat4(quaternion);
@@ -530,15 +553,9 @@ GLuint PanoramaRenderer::createExternalTexture() {
 void PanoramaRenderer::updateVideoFrame() {
     std::lock_guard<std::mutex> lock(textureMutex);  // Lock for thread safety
     if (frame.empty()) {
+        LOGI("frame is empty1!");
         return;  // No frame to update
     }
-    // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
-    cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
-    cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
-    frame = sticher->stich(frontFrame,backFrame);
-    cv::imwrite(sharePath+"/dst_stich_front.jpg",frontFrame);
-    cv::imwrite(sharePath+"/dst_stich_back.jpg",backFrame);
-    cv::imwrite(sharePath+"/dst_stich.jpg",frame);
 
     // Update the OpenGL texture with the current video frame
     glBindTexture(GL_TEXTURE_EXTERNAL_OES, videoTexture);

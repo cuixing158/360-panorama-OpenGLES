@@ -88,8 +88,16 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
             // Set the Surface to the IJKPlayer
             ijkMediaPlayer.setSurface(surface)
-//            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualfish.mp4" // Your video file path
-            ijkMediaPlayer.dataSource = "rtmp://192.168.2.22/live/test"
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtmp_buffer", 1000)
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "rtmp_live", 1)
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "timeout", 3000000) // 设置连接超时
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "packet-buffering", 0)
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_FORMAT, "fflags", "nobuffer")
+            ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "loglevel", "verbose")
+
+
+            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualfish.mp4" // Your video file path
+//            ijkMediaPlayer.dataSource = "rtmp://172.17.10.76:1935/live/streamkey"//"rtmp://192.168.2.22/live/test"
             ijkMediaPlayer.setOnPreparedListener { iMediaPlayer -> iMediaPlayer.start() }
             ijkMediaPlayer.prepareAsync()
 
