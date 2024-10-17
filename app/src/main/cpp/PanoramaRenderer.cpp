@@ -10,7 +10,7 @@ panorama::DualFisheyeSticher initializeSticher(){
 // 360 全景拼接初始化,下面参数适合insta360 设备的
     panorama::cameraParam cam1, cam2;
     cv::Size outputSize = cv::Size(2000, 1000);
-    float hemisphereWidth = 2880.0f; //OBS推流是960.0f
+    float hemisphereWidth = 960.0f; //OBS推流是960.0f
     cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 前单个球
     cam1.FOV = 189.2357;
     cam1.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
@@ -114,7 +114,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
     : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager), sharePath(std::move(filepath)),
     rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f),
-    viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAVIDEO),
+    viewOrientation(ViewMode::PERSPECTIVE), gyroOpen(GyroMode::GYROENABLED), panoMode(SwitchMode::PANORAMAIMAGE),
     view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -210,7 +210,7 @@ GLuint PanoramaRenderer::loadTexture(const char *imagePath) {
     int width, height, nrChannels;
     cv::Mat img = cv::imread(imagePath, cv::IMREAD_COLOR);
     if (img.empty()) {
-        LOGE("Failed to load texture image from asset");
+        LOGE("Failed to load texture image from asset:%s",imagePath);
         return 0;
     }
 
@@ -521,7 +521,7 @@ void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY,
     ////        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
     ////    }
     ////    LOGI("]\n") ;
-    //    gyroMat = glm::rotate(gyroMat,glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+        gyroMat = glm::rotate(gyroMat,glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
     //    gyroMat = glm::rotate(gyroMat,glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 
     // 计算欧拉角

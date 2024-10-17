@@ -96,7 +96,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "loglevel", "verbose")
 
 
-            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualfish.mp4" // Your video file path
+            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualfish1920_960.mp4" // Your video file path
 //            ijkMediaPlayer.dataSource = "rtmp://172.17.10.76:1935/live/streamkey"//"rtmp://192.168.2.22/live/test"
             ijkMediaPlayer.setOnPreparedListener { iMediaPlayer -> iMediaPlayer.start() }
             ijkMediaPlayer.prepareAsync()
