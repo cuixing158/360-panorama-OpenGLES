@@ -35,6 +35,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var gyroSensor: Sensor? = null
     private var accSensor: Sensor? = null
     private var gameRotationVectorSensor: Sensor? = null // Add this line
+    private var rotationSensor: Sensor? = null
+
+    private var gyroX = 0f
+    private var gyroY = 0f
+    private var gyroZ = 0f
+    private var accX = 0f
+    private var accY = 0f
+    private var accZ = 0f
 
     companion object {
         init {
@@ -67,6 +75,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         gyroSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
         accSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gameRotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) // Add this line
+        rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
     }
 
     override fun onResume() {
@@ -75,6 +84,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         gyroSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
         accSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
         gameRotationVectorSensor?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) } // Add this line
+        rotationSensor?.let {sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
 
         try {
             // Initialize the SurfaceTexture and Surface
@@ -157,20 +167,20 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         when (event.sensor.type) {
             Sensor.TYPE_GYROSCOPE -> {
-                val gyroX = event.values[0]
-                val gyroY = event.values[1]
-                val gyroZ = event.values[2]
+                gyroX = event.values[0]
+                gyroY = event.values[1]
+                gyroZ = event.values[2]
                 // Call native function to pass gyro data
-                renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr, gyroX, gyroY, gyroZ, 0f, 0f, 0f)
+                //renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr, gyroX, gyroY, gyroZ, 0f, 0f, 0f)
             }
             Sensor.TYPE_ACCELEROMETER -> {
-                val accX = event.values[0]
-                val accY = event.values[1]
-                val accZ = event.values[2]
+                accX = event.values[0]
+                accY = event.values[1]
+                accZ = event.values[2]
                 // Call native function to pass accelerometer data
-                renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr,0f, 0f, 0f, accX, accY, accZ)
+                //renderer.nativeOnGyroAccUpdate(renderer.nativeRendererPtr,0f, 0f, 0f, accX, accY, accZ)
             }
-            Sensor.TYPE_GAME_ROTATION_VECTOR -> {
+            Sensor.TYPE_ROTATION_VECTOR -> {  // TYPE_GAME_ROTATION_VECTOR 这个类型没有地磁
                 val rotationVector = event.values
                 val quaternion = FloatArray(4)
                 SensorManager.getQuaternionFromVector(quaternion, rotationVector)
@@ -181,7 +191,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 val z = quaternion[3]
 
                 // Call native function to pass quaternion data
-                renderer.nativeOnGameRotationUpdate(renderer.nativeRendererPtr, w, x, y, z)
+                renderer.nativeOnGameRotationUpdate(renderer.nativeRendererPtr, w, x, y, z,accX,accY,accZ)
             }
         }
     }
@@ -239,6 +249,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         external fun nativeHandleTouchDrag(rendererPtr: Long, deltaX: Float, deltaY: Float)
         external fun nativeHandlePinchZoom(rendererPtr: Long, scaleFactor: Float)
         external fun nativeOnGyroAccUpdate(rendererPtr: Long,gyroX: Float, gyroY: Float, gyroZ: Float, accX: Float, accY: Float, accZ: Float)
-        external fun nativeOnGameRotationUpdate(rendererPtr: Long, w: Float, x: Float, y: Float, z: Float) // Add this line
+        external fun nativeOnGameRotationUpdate(rendererPtr: Long, w: Float, x: Float, y: Float, z: Float,accX: Float, accY: Float, accZ: Float) // Add this line
     }
 }

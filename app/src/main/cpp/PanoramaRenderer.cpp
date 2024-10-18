@@ -375,16 +375,20 @@ void PanoramaRenderer::onDrawFrame() {
         upVector = glm::vec3(0.0f, 1.0f, 0.0f);
     }
 
-    if (gyroOpen == PanoramaRenderer::GyroMode::GYROENABLED) {
-        target = glm::vec3(gyroMat * glm::vec4(target, 1.0));
-        upVector = glm::vec3(gyroMat * glm::vec4(upVector, 0.0));
-    }
+//    if (gyroOpen == PanoramaRenderer::GyroMode::GYROENABLED) {
+//        target = glm::vec3(gyroMat * glm::vec4(target, 1.0));
+//        upVector = glm::vec3(gyroMat * glm::vec4(upVector, 0.0));
+//    }
 
     viewDir = glm::normalize(target - cameraPos);
     upDir = glm::normalize(upVector);
 
     // 生成视图矩阵
     view = glm::lookAt(cameraPos, target, upVector);
+
+    if (gyroOpen==PanoramaRenderer::GyroMode::GYROENABLED){
+        view = gyroMat*view;
+    }
 
     if (gyroOpen == PanoramaRenderer::GyroMode::GYRODISABLED) {
         glm::vec3 rotateAxis = glm::normalize(glm::cross(viewDir, upDir));
@@ -452,84 +456,36 @@ void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ, fl
     glm::vec3 gyro(gyroX, gyroY, gyroZ);  // Gyroscope values in rad/s
     glm::vec3 acc(accX, accY, accZ);      // Accelerometer values in m/s²
 
-    // Check if all components of gyro and acc are finite (not NaN or Inf)
-    bool gyroValid1 = std::isfinite(gyro.x) && std::isfinite(gyro.y) && std::isfinite(gyro.z);
-    bool gyroValid2 = !((fabs(gyro.x) < 1e-6) && (fabs(gyro.y) < 1e-6) && (fabs(gyro.z) < 1e-6));
-    bool accValid1 = std::isfinite(acc.x) && std::isfinite(acc.y) && std::isfinite(acc.z);
-    bool accValid2 = !((fabs(acc.x) < 1e-6) && (fabs(acc.y) < 1e-6) && (fabs(acc.z) < 1e-6));
-    bool gyroValid = gyroValid1 && gyroValid2;
-    bool accValid = accValid1 && accValid2;
-
-    static glm::vec3 gyroData, accData;
-    if (gyroValid) {
-        gyroData = gyro;
-    }
-    if (accValid) {
-        accData = acc;
-    }
-
-    bool gyroDataValid = !((fabs(gyroData.x) < 1e-6) && (fabs(gyroData.y) < 1e-6) && (fabs(gyroData.z) < 1e-6));
-    bool accDataValid = !((fabs(accData.x) < 1e-6) && (fabs(accData.y) < 1e-6) && (fabs(accData.z) < 1e-6));
-    if (gyroDataValid && accDataValid) {
-        //        LOGI("gyro and acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
-        //             gyroData.x, gyroData.y, gyroData.z, accData.x, accData.y, accData.z);
-        ahrs.Update(gyroData, accData);
-    }
-
-    //    if (gyroValid && accValid) {
-    //        LOGI("gyro or acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
-    //             gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z);
-    ////        ahrs.Update(gyroData, accData);
-    //    } else {
-    //        LOGE("Invalid gyro or acc data: gyro=(%.6f, %.6f, %.6f), acc=(%.6f, %.6f, %.6f)",
-    //             gyro.x, gyro.y, gyro.z, acc.x, acc.y, acc.z);
-    //    }
-
-    glm::vec3 eulerAngles = ahrs.getEulerAngles();
-    float azimuth = eulerAngles.y;    // Yaw
-    float elevation = eulerAngles.x;  // Pitch
-    // Adjust the rotation based on the gyroscope's rate of rotation
-    //    rotationX = azimuth*180.0f/3.141592653f;
-    //    rotationY = elevation*180.0f/3.141592653f;
-
-    //    LOGI("rotationX:%.2f,rotationY:%.2f\n",rotationX,rotationY);
-
-    // Clamp rotationX and rotationY to prevent excessive rotation
-    // rotationX could be clamped to something like [-90, 90] degrees for a "look up/down" effect
-    //    rotationX = glm::clamp(rotationX, -90.0f, 90.0f);
-    // rotationY could be cyclic, so no clamping is needed unless you want to restrict movement
 }
 
-void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ) {
-    // 创建四元数
-    glm::quat quaternion(quatW, quatX, quatY, quatZ);
+void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ,
+                                          float accX,float accY,float accZ) {
+// 参考https://source.android.com/docs/core/interaction/sensors/sensor-types?hl=zh-cn#accelerometer
+// https://developer.android.com/reference/android/hardware/SensorEvent#values
 
-    // 将四元数转换为欧拉角
-    glm::vec3 eulerAngles = glm::eulerAngles(quaternion);
-    glm::vec3 degreeAngles = glm::degrees(eulerAngles);
+    // 创建四元数,为ENU世界坐标系下的设备绝对位姿
+    glm::quat deviceOrientation(quatW, quatX, quatY, quatZ);
+//    glm::vec3 gravity = glm::vec3(accX,accY,accZ);
 
-//    LOGI("-------------------------------------\n");
-//    LOGI("quaternion degree:%.2f,%.2f,%.2f\n", degreeAngles[0], degreeAngles[1], degreeAngles[2]);
+//    glm::vec3 euler = glm::degrees(glm::eulerAngles(deviceOrientation));
+//    //LOGI("quaternion:%.2f,%.2f,%.2f,%.2f,accelerometer:%.2f,%.2f,%.2f",quatW,quatX,quatY,quatZ,accX,accY,accZ);
+//    LOGI("euler:%.2f,%.2f,%.2f",euler.x,euler.y,euler.z);
+//
+//    // 重力方向的四元数（将重力方向标准化）
+//    glm::vec3 gravityNormalized = glm::normalize(gravity);
+//    glm::quat gravityOrientation = glm::quatLookAt(gravityNormalized, glm::vec3(0, 1,0));
+//
+//    // 计算最终的四元数
+//    glm::quat finalOrientation = gravityOrientation * deviceOrientation;
 
     // 将四元数转换为旋转矩阵
-    gyroMat = glm::toMat4(quaternion);
+    glm::mat4 rotationMatrix = glm::mat4_cast(deviceOrientation);
 
-    // 输出结果
-    //    LOGI("gyroMat Before Matrix:");
-    ////    LOGI("[ ");
-    ////    for (int i = 0; i < 4; ++i) {
-    ////        LOGI("%.2f,%.2f,%.2f,%.2f",gyroMat[i][0],gyroMat[i][1],gyroMat[i][2],gyroMat[i][3]);
-    ////    }
-    ////    LOGI("]\n") ;
-        gyroMat = glm::rotate(gyroMat,glm::radians(-90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
-    //    gyroMat = glm::rotate(gyroMat,glm::radians(-90.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+    rotationMatrix = glm::transpose(rotationMatrix);
+    rotationMatrix = glm::rotate(rotationMatrix,glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
-    // 计算欧拉角
-    //    eulerAngles.x = atan2(gyroMat[2][1], gyroMat[2][2]); // 绕X轴的旋转
-    //    eulerAngles.y = atan2(-gyroMat[2][0], sqrt(gyroMat[2][1] * gyroMat[2][1] + gyroMat[2][2] * gyroMat[2][2])); // 绕Y轴的旋转
-    //    eulerAngles.z = atan2(gyroMat[1][0], gyroMat[0][0]); // 绕Z轴的旋转
-    //    degreeAngles= glm::degrees(eulerAngles);
-    //    LOGI("rotationmatrix degree:%.2f,%.2f,%.2f\n",degreeAngles[0],degreeAngles[1],degreeAngles[2]);
+    // 更新陀螺仪矩阵
+    gyroMat = rotationMatrix;
 }
 
 // Create external texture for video frames
@@ -632,10 +588,10 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGyroAc
 // 处理从 Java 传递来的陀螺仪数据，直接调用JAVA已经融合好的四元数
 JNIEXPORT void JNICALL
 Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGameRotationUpdate(JNIEnv *env, jobject obj, jlong rendererPtr, jfloat quatW, jfloat quatX, jfloat quatY,
-                                                                                             jfloat quatZ) {
+                                                                                             jfloat quatZ,jfloat accX, jfloat accY, jfloat accZ) {
     PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
     if (renderer != nullptr) {
-        renderer->onQuaternionUpdate(quatW, quatX, quatY, quatZ);
+        renderer->onQuaternionUpdate(quatW, quatX, quatY, quatZ,accX,accY,accZ);
     }
 }
 }

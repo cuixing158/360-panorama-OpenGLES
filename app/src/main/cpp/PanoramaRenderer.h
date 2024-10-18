@@ -159,7 +159,7 @@ public:
     void setGyroMode(GyroMode mode);
 
     void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ);
-    void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ);
+    void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ, float accX,float accY,float accZ);
 
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.
     GLuint createExternalTexture();  // Create external texture for rendering video frames
