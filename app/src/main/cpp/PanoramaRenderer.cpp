@@ -376,8 +376,14 @@ void PanoramaRenderer::onDrawFrame() {
     }
 
 //    if (gyroOpen == PanoramaRenderer::GyroMode::GYROENABLED) {
+//        cameraPos = glm::vec3(gyroMat*glm::vec4(cameraPos,1.0));
 //        target = glm::vec3(gyroMat * glm::vec4(target, 1.0));
 //        upVector = glm::vec3(gyroMat * glm::vec4(upVector, 0.0));
+//
+////        glm::vec3 temp = glm::vec3(glm::vec4(1.0f,2.0f,3.0f,4.0f));
+////        LOGI("temp:%.f,%.f,%.f",temp[0],temp[1],temp[2]);
+//        LOGI("target:%.0f,%.0f,%.0f,upVector:%.0f,%.0f,%.0f",target[0],target[1],target[2],
+//             upVector[0],upVector[1],upVector[2]);
 //    }
 
     viewDir = glm::normalize(target - cameraPos);
@@ -385,9 +391,8 @@ void PanoramaRenderer::onDrawFrame() {
 
     // 生成视图矩阵
     view = glm::lookAt(cameraPos, target, upVector);
-
     if (gyroOpen==PanoramaRenderer::GyroMode::GYROENABLED){
-        view = gyroMat*view;
+        view = view*gyroMat;
     }
 
     if (gyroOpen == PanoramaRenderer::GyroMode::GYRODISABLED) {
@@ -480,7 +485,6 @@ void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY,
 
     // 将四元数转换为旋转矩阵
     glm::mat4 rotationMatrix = glm::mat4_cast(deviceOrientation);
-
     rotationMatrix = glm::transpose(rotationMatrix);
     rotationMatrix = glm::rotate(rotationMatrix,glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
