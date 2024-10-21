@@ -1,19 +1,19 @@
 # 360°全景
 
-本项目为Android Studio下工程文件，已实现全景图片，视频的拼接和渲染，还支持手动交互操作！
+本项目为Android Studio下工程文件，已实现全景图片，视频的拼接和渲染，还支持手动交互，陀螺仪控制视角！
 
 *本项目中的ffmpeg预编译so库来源于仓库<https://github.com/bookzhan/bzijkPlayer>,较新的ffmpeg预编译库可以参考 <https://github.com/xufuji456/FFmpegAndroid>，但目前集成新的较为困难，依旧使用的是bzijkplayer*
 
 bzijkPlayer版本：
 
-===== versions =====
-ijkplayer    : 0.8.8
-FFmpeg       : ff3.4--ijk0.8.7--20180103--001
-libavutil    : 55.78.100
-libavcodec   : 57.107.100
-libavformat  : 57.83.100
-libswscale   : 4.8.100
-libswresample: 2.9.100
+===== versions =====<br>
+ijkplayer    : 0.8.8 <br>
+FFmpeg       : ff3.4--ijk0.8.7--20180103--001<br>
+libavutil    : 55.78.100<br>
+libavcodec   : 57.107.100<br>
+libavformat  : 57.83.100<br>
+libswscale   : 4.8.100<br>
+libswresample: 2.9.100<br>
 
 ---
 <!-- @import "[TOC]" {cmd="toc" depthFrom=1 depthTo=6 orderedList=false} -->
@@ -35,13 +35,9 @@ libswresample: 2.9.100
 
 <!-- /code_chunk_output -->
 
-## 预期对标insta360 x3产品功能(算法实现角度)
+## 预期对标insta360 x3产品功能
 
-- 对于消费者来看，除了360运动相机本身硬件和系统操控的一套交互环境软件外，还提供对应APP和桌面Studio软件，主要功能是供拍摄后的视频图像进行后期剪辑，期望达到预期的视觉“电影大片”效果。
-
-- 对于算法开发角度来看，主要是对拍摄后的视频图像做拼接、变换、渲染，这些一般是在APP或者Studio中完成（因为算法需要一定的计算资源），其中“小行星”、“透视图”、“水晶球”是非常典型的三种基础视角形态，在技术层面上，我们已经初步打通了在手机端播放的过程。但对于实际产品应用，与insta360-X3产品比起来，还有很多路要走，这主要是因为有很多产品设计包装功能的东西，根据官网介绍手册和一些电商平台宣传的亮点，无外乎是在上面三种基础模式上的扩展，外加一些辅助支持，比如陀螺仪，AI相关的目标检测，去噪，稳定图像等。
-
-下面依据个人理解，不完全列举了insta360-X3产品的功能和我们期望能做的，欢迎随时协商探讨。
+除了360运动相机本身硬件和系统操控的一套交互环境软件外，还提供对应APP和桌面Studio软件，主要功能是供拍摄后的视频图像进行后期剪辑，期望达到预期的视觉“电影大片”效果。
 
 ### 软件对标
 
