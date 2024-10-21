@@ -114,7 +114,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
     : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager), sharePath(std::move(filepath)),
     rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f),
-    viewOrientation(ViewMode::PERSPECTIVE), gyroOpen(GyroMode::GYROENABLED), panoMode(SwitchMode::PANORAMAIMAGE),
+    viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE),
     view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -352,8 +352,8 @@ void PanoramaRenderer::onDrawFrame() {
     float fovDeg = 70 * zoom;
     if (fovDeg < 50)
         fovDeg = 50;
-    if (fovDeg > 160)
-        fovDeg = 160;
+    if (fovDeg > 145)
+        fovDeg = 145;
 
     glm::vec3 cameraPos, target, upVector;
     glm::vec3 viewDir, upDir;
