@@ -87,6 +87,10 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         rotationSensor?.let {sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME) }
 
         try {
+            // Release old SurfaceTexture and Surface if they exist
+            surface?.release()
+            surfaceTexture?.release()
+
             // Initialize the SurfaceTexture and Surface
             surfaceTexture = renderer.createSurfaceTexture()
             surface = Surface(surfaceTexture)
@@ -227,8 +231,13 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         override fun onDrawFrame(gl: GL10?) {
-            surfaceTexture?.updateTexImage()
-
+            if (surfaceTexture != null) {
+                try {
+                    surfaceTexture?.updateTexImage()
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
             nativeOnDrawFrame(nativeRendererPtr)
         }
 
