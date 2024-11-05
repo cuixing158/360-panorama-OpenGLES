@@ -18,6 +18,19 @@ import tv.danmaku.ijk.media.player.IjkMediaPlayer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
+import android.Manifest
+import android.hardware.camera2.*
+import android.media.Image
+import android.media.ImageReader
+import androidx.core.app.ActivityCompat
+import android.graphics.ImageFormat
+import java.nio.ByteBuffer
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
+import android.widget.Toast
+
+
 class MainActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var glSurfaceView: GLSurfaceView
     private lateinit var renderer: PanoramaRenderer
@@ -43,6 +56,17 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private var accX = 0f
     private var accY = 0f
     private var accZ = 0f
+
+    // android 前后2个摄像头
+    private lateinit var cameraManager: CameraManager
+    private lateinit var backCameraId: String
+    private lateinit var frontCameraId: String
+    private lateinit var backImageReader: ImageReader
+    private lateinit var frontImageReader: ImageReader
+    private lateinit var cameraDevice: CameraDevice
+    private var frontImage: Image? = null
+    private var backImage: Image? = null
+    private val CAMERA_PERMISSION_REQUEST_CODE = 100
 
     companion object {
         init {
@@ -76,7 +100,83 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         accSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         gameRotationVectorSensor = sensorManager.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) // Add this line
         rotationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+
+        // Initialize camera manager
+        cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
+        // 在打开摄像头之前检查权限
+        if (checkCameraPermission()) {
+            // 如果权限已授予，打开摄像头
+            openCameraPermission()
+        } else {
+            // 如果权限未授予，请求权限
+            requestCameraPermission()
+        }
     }
+
+    private fun checkCameraPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestCameraPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), CAMERA_PERMISSION_REQUEST_CODE)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)  // 确保调用父类的实现
+
+        if (requestCode == CAMERA_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // 权限被授予，打开摄像头
+                openCamera()
+            } else {
+                // 权限被拒绝，显示提示信息
+                Toast.makeText(this, "Camera permission is required to access the camera", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun openCameraPermission() {
+        try {
+            // 在调用 openCamera 前再次检查权限
+            if (checkCameraPermission()) {
+                // 获取后摄像头ID
+                val cameraId = getBackCameraId()
+
+                // 打开摄像头
+                cameraManager.openCamera(cameraId, stateCallback, null)
+            } else {
+                // 如果没有权限，显示提示信息
+                Toast.makeText(this, "Camera permission is required to open the camera", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: CameraAccessException) {
+            e.printStackTrace()
+        } catch (e: SecurityException) {
+            // 处理 SecurityException
+            Toast.makeText(this, "Camera access denied. Please grant camera permission.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // 定义 CameraDevice.StateCallback
+    private val stateCallback = object : CameraDevice.StateCallback() {
+        override fun onOpened(camera: CameraDevice) {
+            // 摄像头打开时的操作
+            cameraDevice = camera
+            // 你可以在这里开始设置摄像头的预览，或者捕获会话
+        }
+
+        override fun onDisconnected(camera: CameraDevice) {
+            // 摄像头断开连接时的操作
+            cameraDevice?.close()
+        }
+
+        override fun onError(camera: CameraDevice, error: Int) {
+            // 摄像头打开出错时的操作
+            Toast.makeText(this@MainActivity, "Camera error: $error", Toast.LENGTH_SHORT).show()
+        }
+    }
+
 
     override fun onResume() {
         super.onResume()
@@ -125,6 +225,135 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // Open front and back camera
+        //openCamera()
+    }
+
+    private fun openCamera() {
+        try {
+            backCameraId = getBackCameraId()
+            frontCameraId = getFrontCameraId()
+
+            // 创建ImageReader
+            backImageReader = ImageReader.newInstance(1920, 1080, ImageFormat.YUV_420_888, 2)
+            frontImageReader = ImageReader.newInstance(1920, 1080, ImageFormat.YUV_420_888, 2)
+
+            // 设置前摄像头的ImageReader监听器
+            frontImageReader.setOnImageAvailableListener({ reader ->
+                val image = reader.acquireLatestImage()
+                frontImage = image // 更新前摄像头图像
+                if (backImage != null) {
+                    processImage(frontImage!!, backImage!!) // 同时处理前后图像
+                }
+            }, null)
+
+            // 设置后摄像头的ImageReader监听器
+            backImageReader.setOnImageAvailableListener({ reader ->
+                val image = reader.acquireLatestImage()
+                backImage = image // 更新后摄像头图像
+                if (frontImage != null) {
+                    processImage(frontImage!!, backImage!!) // 同时处理前后图像
+                }
+            }, null)
+
+            // 打开前后摄像头并设置CameraDevice的回调
+            openCameraDevice(frontCameraId)
+            openCameraDevice(backCameraId)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // 打开摄像头设备
+    private fun openCameraDevice(cameraId: String) {
+        try {
+            val cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val cameraDirection = cameraCharacteristics.get(CameraCharacteristics.LENS_FACING)
+            val isFrontCamera = cameraDirection == CameraCharacteristics.LENS_FACING_FRONT
+
+            val imageReader = if (isFrontCamera) frontImageReader else backImageReader
+
+            val stateCallback = object : CameraDevice.StateCallback() {
+                override fun onOpened(camera: CameraDevice) {
+                    // 在摄像头打开时，开始创建会话并启动图像捕获
+                    val captureRequestBuilder = camera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+                    captureRequestBuilder.addTarget(imageReader!!.surface)
+
+                    // 创建一个 CameraCaptureSession 来开始捕获图像
+                    camera.createCaptureSession(listOf(imageReader.surface), object : CameraCaptureSession.StateCallback() {
+                        override fun onConfigured(session: CameraCaptureSession) {
+                            if (cameraDevice != null) {
+                                val captureRequest = captureRequestBuilder.build()
+                                session.setRepeatingRequest(captureRequest, null, null)
+                            }
+                        }
+
+                        override fun onConfigureFailed(session: CameraCaptureSession) {
+                            // 处理配置失败
+                        }
+                    }, null)
+                }
+
+                override fun onDisconnected(camera: CameraDevice) {
+                    camera.close()
+                }
+
+                override fun onError(camera: CameraDevice, error: Int) {
+                    camera.close()
+                }
+            }
+
+            cameraManager.openCamera(cameraId, stateCallback, null)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun getFrontCameraId(): String {
+        // Get the front camera ID
+        return cameraManager.cameraIdList.first {
+            val characteristics = cameraManager.getCameraCharacteristics(it)
+            characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_FRONT
+        }
+    }
+
+    private fun getBackCameraId(): String {
+        // Get the back camera ID
+        return cameraManager.cameraIdList.first {
+            val characteristics = cameraManager.getCameraCharacteristics(it)
+            characteristics.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
+        }
+    }
+
+    private fun processImage(frontImage: Image, backImage: Image) {
+        // 获取图像的宽度和高度
+        val frontWidth = frontImage.width
+        val frontHeight = frontImage.height
+        val backWidth = backImage.width
+        val backHeight = backImage.height
+
+        // Ensure front and back images have the same dimensions
+        if (frontWidth != backWidth || frontHeight != backHeight) {
+            throw IllegalArgumentException("Front and back images must have the same dimensions.")
+        }
+
+        val frontBuffer: ByteBuffer = frontImage.planes[0].buffer
+        val backBuffer: ByteBuffer = backImage.planes[0].buffer
+
+        // Convert image data to ByteArray
+        val frontImageData = ByteArray(frontBuffer.remaining())
+        frontBuffer.get(frontImageData)
+
+        val backImageData = ByteArray(backBuffer.remaining())
+        backBuffer.get(backImageData)
+
+        // Call JNI method to pass image data
+        renderer.nativeProcessImage(renderer.nativeRendererPtr, frontImageData, backImageData,frontWidth,frontHeight)
+
+        // Close the images to release resources
+        frontImage.close()
+        backImage.close()
     }
 
     override fun onPause() {
@@ -259,5 +488,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         external fun nativeHandlePinchZoom(rendererPtr: Long, scaleFactor: Float)
         external fun nativeOnGyroAccUpdate(rendererPtr: Long,gyroX: Float, gyroY: Float, gyroZ: Float, accX: Float, accY: Float, accZ: Float)
         external fun nativeOnGameRotationUpdate(rendererPtr: Long, w: Float, x: Float, y: Float, z: Float,accX: Float, accY: Float, accZ: Float) // Add this line
+        external fun nativeProcessImage(rendererPtr: Long, frontImageData: ByteArray, backImageData: ByteArray,frontWidth:Int, frontHeight:Int)
     }
 }

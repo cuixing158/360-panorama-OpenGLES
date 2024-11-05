@@ -161,6 +161,9 @@ public:
     void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ);
     void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ, float accX,float accY,float accZ);
 
+    // 处理安卓机器前后2个摄像头图像,一样大小的dualFisheye
+    void processFrontBackImages(cv::Mat frontImage,cv::Mat backImage);
+
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.
     GLuint createExternalTexture();  // Create external texture for rendering video frames
 

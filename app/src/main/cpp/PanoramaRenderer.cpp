@@ -114,7 +114,7 @@ PanoramaRenderer::PanoramaRenderer(AAssetManager *assetManager, std::string file
     : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), assetManager(assetManager), sharePath(std::move(filepath)),
     rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f),
-    viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE),
+    viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAVIDEO),
     view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
@@ -492,6 +492,10 @@ void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY,
     gyroMat = rotationMatrix;
 }
 
+void PanoramaRenderer::processFrontBackImages(cv::Mat frontImage,cv::Mat backImage){
+
+}
+
 // Create external texture for video frames
 GLuint PanoramaRenderer::createExternalTexture() {
     GLuint textureId;
@@ -596,6 +600,34 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGameRo
     PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
     if (renderer != nullptr) {
         renderer->onQuaternionUpdate(quatW, quatX, quatY, quatZ,accX,accY,accZ);
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeProcessImage(JNIEnv *env, jobject obj, jlong rendererPtr,
+                                                                                     jbyteArray frontImageData,jbyteArray backImageData,jint frontWidth, jint frontHeight ){
+    // 获取前后图像数据的长度
+    jsize frontImageLength = env->GetArrayLength(frontImageData);
+    jsize backImageLength = env->GetArrayLength(backImageData);
+
+    // 创建一个 PanoramaRenderer 对象
+    PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
+    if (renderer != nullptr) {
+
+        // 获取字节数据
+        jbyte *frontBytes = env->GetByteArrayElements(frontImageData, nullptr);
+        jbyte *backBytes = env->GetByteArrayElements(backImageData, nullptr);
+
+        // 将前后摄像头图像数据转换为 OpenCV Mat
+        cv::Mat frontMat(frontHeight, frontWidth, CV_8UC3, reinterpret_cast<uchar *>(frontBytes));
+        cv::Mat backMat(frontHeight, frontWidth, CV_8UC3, reinterpret_cast<uchar *>(backBytes));
+
+        // 处理图像（例如，传递给渲染器进行拼接或其它处理）
+        renderer->processFrontBackImages(frontMat, backMat);
+
+        // 释放字节数组
+        env->ReleaseByteArrayElements(frontImageData, frontBytes, 0);
+        env->ReleaseByteArrayElements(backImageData, backBytes, 0);
     }
 }
 }
