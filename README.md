@@ -4,6 +4,12 @@
 
 ![panoView](./images/mobileshow.jpg)
 
+---
+
+<https://github.com/user-attachments/assets/76ca11f9-a708-490e-a1dc-4d3a3366bf82>
+
+---
+
 *本项目中的ffmpeg预编译so库来源于仓库<https://github.com/bookzhan/bzijkPlayer>,较新的ffmpeg预编译库可以参考 <https://github.com/xufuji456/FFmpegAndroid>，但目前集成新的较为困难，依旧使用的是bzijkplayer*.
 
 ## Dependencies
