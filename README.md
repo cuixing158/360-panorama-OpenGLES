@@ -8,6 +8,10 @@
 
 <https://github.com/user-attachments/assets/76ca11f9-a708-490e-a1dc-4d3a3366bf82>
 
+<https://github.com/user-attachments/assets/55c13876-425a-4134-ba18-b155dffd6f80>
+
+<https://github.com/user-attachments/assets/a9a48473-b877-4c66-89ab-905f075b2ace>
+
 ---
 
 *本项目中的ffmpeg预编译so库来源于仓库<https://github.com/bookzhan/bzijkPlayer>,较新的ffmpeg预编译库可以参考 <https://github.com/xufuji456/FFmpegAndroid>，但目前集成新的较为困难，依旧使用的是bzijkplayer*.
