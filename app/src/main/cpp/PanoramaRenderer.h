@@ -75,7 +75,10 @@ extern "C" {
 #ifdef __cplusplus
 extern "C" {
 #endif
+    // ios端播放器传入进来的全景视频帧(双球)avFrame
  void  processDecodedFrame(AVFrame* avFrame);
+    // ios 端传递进来的全景图片路径
+ void processPanoImagePath(const char* panoImagePath);
 #ifdef __cplusplus
 }
 #endif
@@ -143,7 +146,8 @@ public:
     enum class ViewMode{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
     enum class GyroMode{GYRODISABLED,GYROENABLED}; // 是否开启陀螺仪
 
-    PanoramaRenderer(AAssetManager* assetManager,std::string filepath);
+    // 构造函数，传递一个可以读写操作权限的路径,比如全景图片或者视频源
+    explicit PanoramaRenderer(std::string filepath);
     ~PanoramaRenderer();
 
     void onSurfaceCreated();
@@ -188,7 +192,6 @@ private:
     cv::VideoCapture videoCapture; // 使用OpenCV解码
 
     static std::mutex textureMutex; // 纹理线程锁
-    AAssetManager* assetManager;
     std::string sharePath; // 共享文件夹，具有读写权限, JNI传入
     glm::mat4 projection;
     glm::mat4 view;

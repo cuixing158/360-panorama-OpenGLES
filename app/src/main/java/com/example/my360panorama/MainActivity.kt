@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         glSurfaceView = GLSurfaceView(this)
         glSurfaceView.setEGLContextClientVersion(3)
 
-        renderer = PanoramaRenderer(assets, filesDir.absolutePath)
+        renderer = PanoramaRenderer(filesDir.absolutePath)
         glSurfaceView.setRenderer(renderer)
 
         glSurfaceView.setOnTouchListener { _, event ->
@@ -204,7 +204,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         // Handle sensor accuracy changes if needed
     }
 
-    private class PanoramaRenderer(assetManager: AssetManager, private val path: String) :
+    private class PanoramaRenderer(private val path: String) :
         GLSurfaceView.Renderer {
 
         var nativeRendererPtr: Long
@@ -212,7 +212,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         private var surfaceTexture: SurfaceTexture? = null
 
         init {
-            nativeRendererPtr = nativeCreateRenderer(assetManager, path)
+            nativeRendererPtr = nativeCreateRenderer(path)
             if (nativeRendererPtr == 0L) {
                 throw RuntimeException("Failed to create native renderer")
             }
@@ -250,7 +250,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         }
 
         // Native functions
-        private external fun nativeCreateRenderer(assetManager: AssetManager, path: String): Long
+        private external fun nativeCreateRenderer(path: String): Long
         private external fun nativeCreateExternalTexture(rendererPtr: Long): Int
         private external fun nativeOnSurfaceCreated(rendererPtr: Long)
         private external fun nativeOnDrawFrame(rendererPtr: Long)
