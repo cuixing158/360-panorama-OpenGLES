@@ -6,12 +6,12 @@ std::mutex PanoramaRenderer::textureMutex;
 panorama::DualFisheyeSticher initializeSticher();
 panorama::DualFisheyeSticher sticher = initializeSticher();
 
-panorama::DualFisheyeSticher initializeSticher(){
-// 360 全景拼接初始化,下面参数适合insta360 设备的
+panorama::DualFisheyeSticher initializeSticher() {
+    // 360 全景拼接初始化,下面参数适合insta360 设备的
     panorama::cameraParam cam1, cam2;
     cv::Size outputSize = cv::Size(2000, 1000);
-    float hemisphereWidth = 960.0f; //OBS推流是960.0f
-    cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 前单个球
+    float hemisphereWidth = 960.0f;                                                       //OBS推流是960.0f
+    cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth, hemisphereWidth, CV_8UC3);  // 前单个球
     cam1.FOV = 189.2357;
     cam1.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
     cam1.radius = hemisphereWidth / 2.0;
@@ -19,8 +19,8 @@ panorama::DualFisheyeSticher initializeSticher(){
     cam1.rotateY = 0.2971962;
     cam1.rotateZ = -0.0007757799;
 
-// cam2
-    cam2.circleFisheyeImage =  cv::Mat::zeros(hemisphereWidth,hemisphereWidth,CV_8UC3); // 后单个球;
+    // cam2
+    cam2.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth, hemisphereWidth, CV_8UC3);  // 后单个球;
     cam2.FOV = 194.1712;
     cam2.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
     cam2.radius = hemisphereWidth / 2.0;
@@ -35,7 +35,7 @@ void processDecodedFrame(AVFrame *avFrame) {
     PanoramaRenderer::processDecodedFrameImpl(avFrame);
 }
 
-void PanoramaRenderer::setPanoImagePath(const char* panoImagePath) {
+void PanoramaRenderer::setPanoImagePath(const char *panoImagePath) {
     // Lock the textureMutex and update the frame
     std::lock_guard<std::mutex> lock(textureMutex);
     {
@@ -74,12 +74,12 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
             frame = img.clone();
 
             // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
-            cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
-            cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
-            frame = sticher.stich(frontFrame,backFrame);
-        //    cv::imwrite(sharePath+"/dst_stich_front.jpg",frontFrame);
-        //    cv::imwrite(sharePath+"/dst_stich_back.jpg",backFrame);
-        //    cv::imwrite(sharePath+"/dst_stich.jpg",frame);
+            cv::Mat frontFrame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
+            cv::Mat backFrame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
+            frame = sticher.stich(frontFrame, backFrame);
+            //    cv::imwrite(sharePath+"/dst_stich_front.jpg",frontFrame);
+            //    cv::imwrite(sharePath+"/dst_stich_back.jpg",backFrame);
+            //    cv::imwrite(sharePath+"/dst_stich.jpg",frame);
         }
 
         // Free resources
@@ -96,21 +96,16 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
             cv::flip(img, img, 0);
             frame = img.clone();
 
-            cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
-            cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
-            frame = sticher.stich(frontFrame,backFrame);
+            cv::Mat frontFrame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
+            cv::Mat backFrame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
+            frame = sticher.stich(frontFrame, backFrame);
         }
     }
-//    this->setSwitchMode(SwitchMode::PANORAMAVIDEO);
+    //    this->setSwitchMode(SwitchMode::PANORAMAVIDEO);
 }
 
-PanoramaRenderer::PanoramaRenderer(const char* sharePath)
-    : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
-    sphereData(new SphereData(1.0f, 50, 50)), sharePath(sharePath),
-    panoramaImagePath(std::string(sharePath)+"/360panorama.jpg"),
-    rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f),
-    viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE),
-    view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
+PanoramaRenderer::PanoramaRenderer(const char *sharePath)
+    : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(sharePath), panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);
@@ -205,7 +200,7 @@ GLuint PanoramaRenderer::loadTexture(const char *imagePath) {
     int width, height, nrChannels;
     cv::Mat img = cv::imread(imagePath, cv::IMREAD_COLOR);
     if (img.empty()) {
-        LOGE("Failed to load texture image from asset:%s",imagePath);
+        LOGE("Failed to load texture image from asset:%s", imagePath);
         return 0;
     }
 
@@ -298,7 +293,7 @@ void PanoramaRenderer::onSurfaceCreated() {
     } else if (panoMode == SwitchMode::PANORAMAVIDEO) {
         glGenTextures(1, &videoTexture);
         glBindTexture(GL_TEXTURE_2D, videoTexture);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frameWidth, frameHeight,
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows,
                      0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -370,24 +365,24 @@ void PanoramaRenderer::onDrawFrame() {
         upVector = glm::vec3(0.0f, 1.0f, 0.0f);
     }
 
-//    if (gyroOpen == PanoramaRenderer::GyroMode::GYROENABLED) {
-//        cameraPos = glm::vec3(gyroMat*glm::vec4(cameraPos,1.0));
-//        target = glm::vec3(gyroMat * glm::vec4(target, 1.0));
-//        upVector = glm::vec3(gyroMat * glm::vec4(upVector, 0.0));
-//
-////        glm::vec3 temp = glm::vec3(glm::vec4(1.0f,2.0f,3.0f,4.0f));
-////        LOGI("temp:%.f,%.f,%.f",temp[0],temp[1],temp[2]);
-//        LOGI("target:%.0f,%.0f,%.0f,upVector:%.0f,%.0f,%.0f",target[0],target[1],target[2],
-//             upVector[0],upVector[1],upVector[2]);
-//    }
+    //    if (gyroOpen == PanoramaRenderer::GyroMode::GYROENABLED) {
+    //        cameraPos = glm::vec3(gyroMat*glm::vec4(cameraPos,1.0));
+    //        target = glm::vec3(gyroMat * glm::vec4(target, 1.0));
+    //        upVector = glm::vec3(gyroMat * glm::vec4(upVector, 0.0));
+    //
+    ////        glm::vec3 temp = glm::vec3(glm::vec4(1.0f,2.0f,3.0f,4.0f));
+    ////        LOGI("temp:%.f,%.f,%.f",temp[0],temp[1],temp[2]);
+    //        LOGI("target:%.0f,%.0f,%.0f,upVector:%.0f,%.0f,%.0f",target[0],target[1],target[2],
+    //             upVector[0],upVector[1],upVector[2]);
+    //    }
 
     viewDir = glm::normalize(target - cameraPos);
     upDir = glm::normalize(upVector);
 
     // 生成视图矩阵
     view = glm::lookAt(cameraPos, target, upVector);
-    if (gyroOpen==PanoramaRenderer::GyroMode::GYROENABLED){
-        view = view*gyroMat;
+    if (gyroOpen == PanoramaRenderer::GyroMode::GYROENABLED) {
+        view = view * gyroMat;
     }
 
     if (gyroOpen == PanoramaRenderer::GyroMode::GYRODISABLED) {
@@ -455,33 +450,32 @@ void PanoramaRenderer::setGyroMode(GyroMode mode) {
 void PanoramaRenderer::onGyroAccUpdate(float gyroX, float gyroY, float gyroZ, float accX, float accY, float accZ) {
     glm::vec3 gyro(gyroX, gyroY, gyroZ);  // Gyroscope values in rad/s
     glm::vec3 acc(accX, accY, accZ);      // Accelerometer values in m/s²
-
 }
 
 void PanoramaRenderer::onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ,
-                                          float accX,float accY,float accZ) {
-// 参考https://source.android.com/docs/core/interaction/sensors/sensor-types?hl=zh-cn#accelerometer
-// https://developer.android.com/reference/android/hardware/SensorEvent#values
+                                          float accX, float accY, float accZ) {
+    // 参考https://source.android.com/docs/core/interaction/sensors/sensor-types?hl=zh-cn#accelerometer
+    // https://developer.android.com/reference/android/hardware/SensorEvent#values
 
     // 创建四元数,为ENU世界坐标系下的设备绝对位姿
     glm::quat deviceOrientation(quatW, quatX, quatY, quatZ);
-//    glm::vec3 gravity = glm::vec3(accX,accY,accZ);
+    //    glm::vec3 gravity = glm::vec3(accX,accY,accZ);
 
-//    glm::vec3 euler = glm::degrees(glm::eulerAngles(deviceOrientation));
-//    //LOGI("quaternion:%.2f,%.2f,%.2f,%.2f,accelerometer:%.2f,%.2f,%.2f",quatW,quatX,quatY,quatZ,accX,accY,accZ);
-//    LOGI("euler:%.2f,%.2f,%.2f",euler.x,euler.y,euler.z);
-//
-//    // 重力方向的四元数（将重力方向标准化）
-//    glm::vec3 gravityNormalized = glm::normalize(gravity);
-//    glm::quat gravityOrientation = glm::quatLookAt(gravityNormalized, glm::vec3(0, 1,0));
-//
-//    // 计算最终的四元数
-//    glm::quat finalOrientation = gravityOrientation * deviceOrientation;
+    //    glm::vec3 euler = glm::degrees(glm::eulerAngles(deviceOrientation));
+    //    //LOGI("quaternion:%.2f,%.2f,%.2f,%.2f,accelerometer:%.2f,%.2f,%.2f",quatW,quatX,quatY,quatZ,accX,accY,accZ);
+    //    LOGI("euler:%.2f,%.2f,%.2f",euler.x,euler.y,euler.z);
+    //
+    //    // 重力方向的四元数（将重力方向标准化）
+    //    glm::vec3 gravityNormalized = glm::normalize(gravity);
+    //    glm::quat gravityOrientation = glm::quatLookAt(gravityNormalized, glm::vec3(0, 1,0));
+    //
+    //    // 计算最终的四元数
+    //    glm::quat finalOrientation = gravityOrientation * deviceOrientation;
 
     // 将四元数转换为旋转矩阵
     glm::mat4 rotationMatrix = glm::mat4_cast(deviceOrientation);
     rotationMatrix = glm::transpose(rotationMatrix);
-    rotationMatrix = glm::rotate(rotationMatrix,glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
+    rotationMatrix = glm::rotate(rotationMatrix, glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f));
 
     // 更新陀螺仪矩阵
     gyroMat = rotationMatrix;
@@ -524,8 +518,8 @@ void PanoramaRenderer::updateVideoFrame() {
 // JNI Interfaces
 extern "C" {
 JNIEXPORT jlong JNICALL
-Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeCreateRenderer(JNIEnv *env, jobject obj,  jstring path) {
-//    AAssetManager *mgr = AAssetManager_fromJava(env, assetManager);
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeCreateRenderer(JNIEnv *env, jobject obj, jstring path) {
+    //    AAssetManager *mgr = AAssetManager_fromJava(env, assetManager);
     // Returns a pointer to an array of bytes representing the string
     // in modified UTF-8 encoding. This array is valid until it is released
     // by ReleaseStringUTFChars().
@@ -587,10 +581,10 @@ Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGyroAc
 // 处理从 Java 传递来的陀螺仪数据，直接调用JAVA已经融合好的四元数
 JNIEXPORT void JNICALL
 Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeOnGameRotationUpdate(JNIEnv *env, jobject obj, jlong rendererPtr, jfloat quatW, jfloat quatX, jfloat quatY,
-                                                                                             jfloat quatZ,jfloat accX, jfloat accY, jfloat accZ) {
+                                                                                             jfloat quatZ, jfloat accX, jfloat accY, jfloat accZ) {
     PanoramaRenderer *renderer = reinterpret_cast<PanoramaRenderer *>(rendererPtr);
     if (renderer != nullptr) {
-        renderer->onQuaternionUpdate(quatW, quatX, quatY, quatZ,accX,accY,accZ);
+        renderer->onQuaternionUpdate(quatW, quatX, quatY, quatZ, accX, accY, accZ);
     }
 }
 }

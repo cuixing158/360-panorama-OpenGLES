@@ -10,7 +10,6 @@
 #include "dualFisheyeSticher.hpp"
 #endif
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -35,8 +34,8 @@ extern "C" {
 #include <atomic>
 #include <mutex>
 #include <condition_variable>
-#include<iostream>
-#include<string>
+#include <iostream>
+#include <string>
 #include <utility>
 #endif
 
@@ -71,7 +70,6 @@ extern "C" {
 #include "glm/gtx/quaternion.hpp"
 #endif
 
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -85,13 +83,13 @@ void processDecodedFrame(AVFrame* avFrame);
 
 #ifdef __cplusplus
 class MadgwickAHRS {
-public:
+   public:
     float samplePeriod;
     glm::quat quaternion;  // Quaternion describing the Earth relative to the sensor
-    float beta;  // Algorithm gain
+    float beta;            // Algorithm gain
 
-    MadgwickAHRS(float samplePeriod = 1.0f/256.0f, float beta = 1.0f)
-            : samplePeriod(samplePeriod), beta(beta) {
+    MadgwickAHRS(float samplePeriod = 1.0f / 256.0f, float beta = 1.0f)
+        : samplePeriod(samplePeriod), beta(beta) {
         quaternion = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     }
 
@@ -99,40 +97,38 @@ public:
         // Normalize accelerometer measurement
         glm::vec3 acc = glm::normalize(accelerometer);
 
-//        LOGI("gyroscope : (%.6f, %.6f, %.6f)", gyroscope.x, gyroscope.y, gyroscope.z);
-//        LOGI("Normalized accelerometer: (%.6f, %.6f, %.6f)", acc.x, acc.y, acc.z);
+        //        LOGI("gyroscope : (%.6f, %.6f, %.6f)", gyroscope.x, gyroscope.y, gyroscope.z);
+        //        LOGI("Normalized accelerometer: (%.6f, %.6f, %.6f)", acc.x, acc.y, acc.z);
 
         // Gradient descent algorithm corrective step
         glm::vec3 F(
-                2.0f * (quaternion.x * quaternion.z - quaternion.w * quaternion.y) - acc.x,
-                2.0f * (quaternion.w * quaternion.x + quaternion.y * quaternion.z) - acc.y,
-                2.0f * (0.5f - quaternion.x * quaternion.x - quaternion.y * quaternion.y) - acc.z
-        );
+            2.0f * (quaternion.x * quaternion.z - quaternion.w * quaternion.y) - acc.x,
+            2.0f * (quaternion.w * quaternion.x + quaternion.y * quaternion.z) - acc.y,
+            2.0f * (0.5f - quaternion.x * quaternion.x - quaternion.y * quaternion.y) - acc.z);
 
-//        LOGI("F vector: (%.6f, %.6f, %.6f)", F.x, F.y, F.z);
+        //        LOGI("F vector: (%.6f, %.6f, %.6f)", F.x, F.y, F.z);
 
         glm::mat4 J(
-                -2.0f * quaternion.y,  2.0f * quaternion.z, -2.0f * quaternion.w,  2.0f * quaternion.x,
-                2.0f * quaternion.x,   2.0f * quaternion.w,  2.0f * quaternion.z, -2.0f * quaternion.y,
-                0.0f, -4.0f * quaternion.x, -4.0f * quaternion.y,  0.0f,
-                0.0f, 0.0f, 0.0f, 0.0f
-        );
+            -2.0f * quaternion.y, 2.0f * quaternion.z, -2.0f * quaternion.w, 2.0f * quaternion.x,
+            2.0f * quaternion.x, 2.0f * quaternion.w, 2.0f * quaternion.z, -2.0f * quaternion.y,
+            0.0f, -4.0f * quaternion.x, -4.0f * quaternion.y, 0.0f,
+            0.0f, 0.0f, 0.0f, 0.0f);
 
         glm::vec4 F4 = glm::vec4(F, 0.0f);
         glm::vec4 step4 = glm::normalize(glm::transpose(J) * F4);
 
-//        LOGI("Step vector: (%.6f, %.6f, %.6f, %.6f)", step4.x, step4.y, step4.z, step4.w);
+        //        LOGI("Step vector: (%.6f, %.6f, %.6f, %.6f)", step4.x, step4.y, step4.z, step4.w);
 
         // Compute rate of change of quaternion
         glm::quat qDot = 0.5f * quaternion * glm::quat(0.0f, gyroscope.x, gyroscope.y, gyroscope.z) - beta * glm::quat(step4);
 
-//        LOGI("qDot: (%.6f, %.6f, %.6f, %.6f)", qDot.w, qDot.x, qDot.y, qDot.z);
+        //        LOGI("qDot: (%.6f, %.6f, %.6f, %.6f)", qDot.w, qDot.x, qDot.y, qDot.z);
 
         // Integrate to yield quaternion
         quaternion += qDot * samplePeriod;
         quaternion = glm::normalize(quaternion);
 
-//        LOGI("Updated quaternion: (%.6f, %.6f, %.6f, %.6f)", quaternion.w, quaternion.x, quaternion.y, quaternion.z);
+        //        LOGI("Updated quaternion: (%.6f, %.6f, %.6f, %.6f)", quaternion.w, quaternion.x, quaternion.y, quaternion.z);
     }
 
     glm::vec3 getEulerAngles() const {
@@ -141,10 +137,14 @@ public:
 };
 
 class PanoramaRenderer {
-public:
-    enum class SwitchMode{PANORAMAVIDEO,PANORAMAIMAGE}; //全景视频，全景图像
-    enum class ViewMode{PERSPECTIVE,LITTLEPLANET,CRYSTALBALL}; // 透视图,小行星，水晶球视角看全景
-    enum class GyroMode{GYRODISABLED,GYROENABLED}; // 是否开启陀螺仪
+   public:
+    enum class SwitchMode { PANORAMAVIDEO,
+                            PANORAMAIMAGE };  //全景视频，全景图像
+    enum class ViewMode { PERSPECTIVE,
+                          LITTLEPLANET,
+                          CRYSTALBALL };  // 透视图,小行星，水晶球视角看全景
+    enum class GyroMode { GYRODISABLED,
+                          GYROENABLED };  // 是否开启陀螺仪
 
     // 构造函数，传递一个可以读写操作权限的路径,比如全景图片或者视频源
     explicit PanoramaRenderer(const char* filepath);
@@ -162,45 +162,45 @@ public:
     void setViewMode(ViewMode mode);
     void setGyroMode(GyroMode mode);
 
-    void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ,float accX,float accY,float accZ);
-    void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ, float accX,float accY,float accZ);
+    void onGyroAccUpdate(float gyroX, float gyroY, float gyroZ, float accX, float accY, float accZ);
+    void onQuaternionUpdate(float quatW, float quatX, float quatY, float quatZ, float accX, float accY, float accZ);
 
     //This method generates an external texture (using GL_TEXTURE_EXTERNAL_OES) and sets texture parameters. It is used to create the texture ID that is returned to the Kotlin side and used in SurfaceTexture.
     GLuint createExternalTexture();  // Create external texture for rendering video frames
 
     // 用于IJKplayer传入进来的帧
-    static void processDecodedFrameImpl(AVFrame* avFrame); // 全景视频传入帧渲染，android 的bzijkplayer传递过来的AVFrame
-    void setPanoImagePath(const char* panoImagePath); // 全景图片传入渲染,主要给IOS调用，申明类对象后，直接调用此函数
+    static void processDecodedFrameImpl(AVFrame* avFrame);  // 全景视频传入帧渲染，android 的bzijkplayer传递过来的AVFrame
+    void setPanoImagePath(const char* panoImagePath);       // 全景图片传入渲染,主要给IOS调用，申明类对象后，直接调用此函数
 
-private:
-    GLuint loadShader(GLenum type, const char *shaderSrc);
-    GLuint createProgram(const char *vertexSrc, const char *fragmentSrc);
+   private:
+    GLuint loadShader(GLenum type, const char* shaderSrc);
+    GLuint createProgram(const char* vertexSrc, const char* fragmentSrc);
 
     void updateVideoFrame();  // Update texture with video frame from SurfaceTexture
 
     // 全景图像需要的函数
-    static GLuint loadTexture(const char *imagePath);
+    static GLuint loadTexture(const char* imagePath);
 
     // 全景图片和视频渲染
     GLuint shaderProgram;
-    GLuint texture; // 全景图片纹理
-    GLuint vao, vboVertices, vboTexCoords,vboIndices;
+    GLuint texture;  // 全景图片纹理
+    GLuint vao, vboVertices, vboTexCoords, vboIndices;
     SphereData* sphereData;
-     static cv::Mat frame;  // 全景视频帧
-    int frameWidth,frameHeight; //全景视频帧的宽和高
-    GLuint videoTexture; // 全景视频帧纹理
-    cv::VideoCapture videoCapture; // 使用OpenCV解码
+    static cv::Mat frame;  // 全景视频帧
+    //int frameWidth,frameHeight; //全景视频帧的宽和高
+    GLuint videoTexture;            // 全景视频帧纹理
+    cv::VideoCapture videoCapture;  // 使用OpenCV解码
 
-    static std::mutex textureMutex; // 纹理线程锁
-    std::string sharePath; // 共享文件夹，具有读写权限, JNI传入,ISO对应沙盒，APP内部路径
-    std::string panoramaImagePath; // 全景图片路径
+    static std::mutex textureMutex;  // 纹理线程锁
+    std::string sharePath;           // 共享文件夹，具有读写权限, JNI传入,ISO对应沙盒，APP内部路径
+    std::string panoramaImagePath;   // 全景图片路径
     glm::mat4 projection;
     glm::mat4 view;
     glm::mat4 gyroMat;
-    float rotationX,rotationY,zoom;
-    ViewMode viewOrientation; // 透视图，小行星，水晶球
-    GyroMode gyroOpen; // 是否开启陀螺仪
-    SwitchMode panoMode; // 全景视频，全景图像切换
+    float rotationX, rotationY, zoom;
+    ViewMode viewOrientation;  // 透视图，小行星，水晶球
+    GyroMode gyroOpen;         // 是否开启陀螺仪
+    SwitchMode panoMode;       // 全景视频，全景图像切换
 
     // 手机陀螺仪
     MadgwickAHRS ahrs;
@@ -211,4 +211,4 @@ private:
 };
 #endif
 
-#endif // PANORAMARENDERER_H
+#endif  // PANORAMARENDERER_H
