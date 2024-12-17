@@ -35,6 +35,21 @@ void processDecodedFrame(AVFrame *avFrame) {
     PanoramaRenderer::processDecodedFrameImpl(avFrame);
 }
 
+void PanoramaRenderer::processUI(cv::Mat &matFrame) {
+    // Lock the textureMutex and update the frame
+    std::lock_guard<std::mutex> lock(textureMutex);
+    {
+        cv::Mat img;
+        cv::cvtColor(matFrame, img, cv::COLOR_BGR2RGB);
+        cv::flip(img, img, 0);
+        frame = img.clone();
+
+        // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
+        cv::Mat frontFrame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
+        cv::Mat backFrame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
+        frame = sticher.stich(frontFrame, backFrame);
+    }
+}
 void PanoramaRenderer::setPanoImagePath(const char *panoImagePath) {
     // Lock the textureMutex and update the frame
     std::lock_guard<std::mutex> lock(textureMutex);
@@ -104,8 +119,24 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
     //    this->setSwitchMode(SwitchMode::PANORAMAVIDEO);
 }
 
-PanoramaRenderer::PanoramaRenderer(const char *sharePath)
-    : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(sharePath), panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
+PanoramaRenderer::PanoramaRenderer() : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(""), panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
+    // Open the input file
+    //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
+    //videoCapture.open(mp4File);
+
+    if (viewOrientation == PanoramaRenderer::ViewMode::PERSPECTIVE) {
+        zoom = 1;
+    } else if (viewOrientation == PanoramaRenderer::ViewMode::LITTLEPLANET) {
+        zoom = 2;
+    } else if (viewOrientation == PanoramaRenderer::ViewMode::CRYSTALBALL) {
+        zoom = 2;
+    } else {
+        zoom = 1;
+    }
+}
+
+PanoramaRenderer::PanoramaRenderer(const char *shareFolder)
+    : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(shareFolder), panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);

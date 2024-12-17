@@ -147,7 +147,8 @@ class PanoramaRenderer {
                           GYROENABLED };  // 是否开启陀螺仪
 
     // 构造函数，传递一个可以读写操作权限的路径,比如全景图片或者视频源
-    explicit PanoramaRenderer(const char* filepath);
+    PanoramaRenderer();
+    PanoramaRenderer(const char* shareFolder);
     ~PanoramaRenderer();
 
     void onSurfaceCreated();
@@ -170,6 +171,7 @@ class PanoramaRenderer {
 
     // 用于IJKplayer传入进来的帧
     static void processDecodedFrameImpl(AVFrame* avFrame);  // 全景视频传入帧渲染，android 的bzijkplayer传递过来的AVFrame
+    void processUI(cv::Mat& matFrame);                      // ios 播放器传递过来的cv::frame
     void setPanoImagePath(const char* panoImagePath);       // 全景图片传入渲染,主要给IOS调用，申明类对象后，直接调用此函数
 
    private:
