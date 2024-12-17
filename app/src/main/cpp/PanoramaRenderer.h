@@ -75,10 +75,10 @@ extern "C" {
 #ifdef __cplusplus
 extern "C" {
 #endif
-    // ios端播放器传入进来的全景视频帧(双球)avFrame
- void  processDecodedFrame(AVFrame* avFrame);
-    // ios 端传递进来的全景图片路径
- void processPanoImagePath(const char* panoImagePath);
+
+// 处理解码帧（来自IJKPlayer），ios端播放器传入进来的全景视频帧(双球)avFrame
+void processDecodedFrame(AVFrame* avFrame);
+
 #ifdef __cplusplus
 }
 #endif
@@ -147,7 +147,7 @@ public:
     enum class GyroMode{GYRODISABLED,GYROENABLED}; // 是否开启陀螺仪
 
     // 构造函数，传递一个可以读写操作权限的路径,比如全景图片或者视频源
-    explicit PanoramaRenderer(std::string filepath);
+    explicit PanoramaRenderer(const char* filepath);
     ~PanoramaRenderer();
 
     void onSurfaceCreated();
@@ -169,8 +169,8 @@ public:
     GLuint createExternalTexture();  // Create external texture for rendering video frames
 
     // 用于IJKplayer传入进来的帧
-    static void processDecodedFrameImpl(AVFrame* avFrame); // android 的bzijkplayer传递过来的AVFrame
-    void processUI(cv::Mat& matFrame); // ios 播放器传递过来的cv::frame
+    static void processDecodedFrameImpl(AVFrame* avFrame); // 全景视频传入帧渲染，android 的bzijkplayer传递过来的AVFrame
+    void setPanoImagePath(const char* panoImagePath); // 全景图片传入渲染,主要给IOS调用，申明类对象后，直接调用此函数
 
 private:
     GLuint loadShader(GLenum type, const char *shaderSrc);
@@ -192,7 +192,8 @@ private:
     cv::VideoCapture videoCapture; // 使用OpenCV解码
 
     static std::mutex textureMutex; // 纹理线程锁
-    std::string sharePath; // 共享文件夹，具有读写权限, JNI传入
+    std::string sharePath; // 共享文件夹，具有读写权限, JNI传入,ISO对应沙盒，APP内部路径
+    std::string panoramaImagePath; // 全景图片路径
     glm::mat4 projection;
     glm::mat4 view;
     glm::mat4 gyroMat;

@@ -35,23 +35,12 @@ void processDecodedFrame(AVFrame *avFrame) {
     PanoramaRenderer::processDecodedFrameImpl(avFrame);
 }
 
-void processPanoramaImagePath(const char* panoImagePath){
-
-}
-
-void PanoramaRenderer::processUI(cv::Mat &matFrame) {
+void PanoramaRenderer::setPanoImagePath(const char* panoImagePath) {
     // Lock the textureMutex and update the frame
     std::lock_guard<std::mutex> lock(textureMutex);
     {
-        cv::Mat img;
-        cv::cvtColor(matFrame, img, cv::COLOR_BGR2RGB);
-        cv::flip(img, img, 0);
-        frame = img.clone();
-
-        // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
-        cv::Mat frontFrame = frame(cv::Rect(0,0,frame.cols/2,frame.rows));
-        cv::Mat backFrame = frame(cv::Rect(frame.cols/2,0,frame.cols/2,frame.rows));
-        frame = sticher.stich(frontFrame,backFrame);
+        panoramaImagePath = panoImagePath;
+        setSwitchMode(SwitchMode::PANORAMAIMAGE);
     }
 }
 
@@ -115,9 +104,10 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
 //    this->setSwitchMode(SwitchMode::PANORAMAVIDEO);
 }
 
-PanoramaRenderer::PanoramaRenderer(std::string filepath)
+PanoramaRenderer::PanoramaRenderer(const char* sharePath)
     : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
-    sphereData(new SphereData(1.0f, 50, 50)), sharePath(std::move(filepath)),
+    sphereData(new SphereData(1.0f, 50, 50)), sharePath(sharePath),
+    panoramaImagePath(std::string(sharePath)+"/360panorama.jpg"),
     rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f),
     viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE),
     view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
@@ -296,7 +286,7 @@ void PanoramaRenderer::onSurfaceCreated() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sphereData->getNumIndices() * sizeof(GLushort), sphereData->getIndices(), GL_STATIC_DRAW);
 
     if (panoMode == SwitchMode::PANORAMAIMAGE) {
-        std::string imagePath = sharePath + "/360panorama.jpg";
+        std::string imagePath = panoramaImagePath;
         texture = loadTexture(imagePath.c_str());
         if (!texture) {
             LOGE("Failed to load texture");
@@ -534,13 +524,13 @@ void PanoramaRenderer::updateVideoFrame() {
 // JNI Interfaces
 extern "C" {
 JNIEXPORT jlong JNICALL
-Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeCreateRenderer(JNIEnv *env, jobject obj, jobject assetManager, jstring path) {
-    AAssetManager *mgr = AAssetManager_fromJava(env, assetManager);
+Java_com_example_my360panorama_MainActivity_00024PanoramaRenderer_nativeCreateRenderer(JNIEnv *env, jobject obj,  jstring path) {
+//    AAssetManager *mgr = AAssetManager_fromJava(env, assetManager);
     // Returns a pointer to an array of bytes representing the string
     // in modified UTF-8 encoding. This array is valid until it is released
     // by ReleaseStringUTFChars().
     const char *temp = env->GetStringUTFChars(path, nullptr);
-    return reinterpret_cast<jlong>(new PanoramaRenderer(mgr, std::string(temp)));
+    return reinterpret_cast<jlong>(new PanoramaRenderer(temp));
 }
 
 JNIEXPORT jint JNICALL
