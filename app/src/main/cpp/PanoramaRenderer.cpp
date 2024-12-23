@@ -119,7 +119,11 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
     //    this->setSwitchMode(SwitchMode::PANORAMAVIDEO);
 }
 
-PanoramaRenderer::PanoramaRenderer() : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(""), panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
+PanoramaRenderer::PanoramaRenderer() : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0),
+vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(""),
+panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f),
+widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET),
+gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);
@@ -136,7 +140,12 @@ PanoramaRenderer::PanoramaRenderer() : shaderProgram(0), texture(0), videoTextur
 }
 
 PanoramaRenderer::PanoramaRenderer(const char *shareFolder)
-    : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(shareFolder), panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET), gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
+    : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
+    sphereData(new SphereData(1.0f, 50, 50)), sharePath(shareFolder),
+    panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f),
+    zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::CRYSTALBALL),
+    gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)),
+    gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);
