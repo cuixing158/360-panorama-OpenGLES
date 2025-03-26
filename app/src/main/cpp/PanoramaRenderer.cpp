@@ -3,35 +3,10 @@
 // 钩子函数，从ff_ffplay.c中执行
 cv::Mat PanoramaRenderer::frame;
 std::mutex PanoramaRenderer::textureMutex;
-panorama::DualFisheyeSticher initializeSticher();
-panorama::DualFisheyeSticher sticher = initializeSticher();
-
-panorama::DualFisheyeSticher initializeSticher() {
-    // 360 全景拼接初始化,下面参数适合insta360 设备的
-    panorama::cameraParam cam1, cam2;
-    cv::Size outputSize = cv::Size(2000, 1000);
-    float hemisphereWidth = 960.0f;                                                       //OBS推流是960.0f
-    cam1.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth, hemisphereWidth, CV_8UC3);  // 前单个球
-    cam1.FOV = 189.2357;
-    cam1.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
-    cam1.radius = hemisphereWidth / 2.0;
-    cam1.rotateX = 0.01112242;
-    cam1.rotateY = 0.2971962;
-    cam1.rotateZ = -0.0007757799;
-
-    // cam2
-    cam2.circleFisheyeImage = cv::Mat::zeros(hemisphereWidth, hemisphereWidth, CV_8UC3);  // 后单个球;
-    cam2.FOV = 194.1712;
-    cam2.centerPt = cv::Point2f(hemisphereWidth / 2.0, hemisphereWidth / 2.0);
-    cam2.radius = hemisphereWidth / 2.0;
-    cam2.rotateX = -0.7172632;
-    cam2.rotateY = 0.5694329;
-    cam2.rotateZ = 179.9732;
-    panorama::DualFisheyeSticher sticher = panorama::DualFisheyeSticher(cam1, cam2, outputSize);
-    return sticher;
-}
+panorama::DualFisheyeStitcher sticher(cv::Size(480,480),cv::Size(1000,500));
 
 void processDecodedFrame(AVFrame *avFrame) {
+    LOGI("processDecodedFrame------------GET IN--------------");
     PanoramaRenderer::processDecodedFrameImpl(avFrame);
 }
 
@@ -47,7 +22,7 @@ void PanoramaRenderer::processUI(cv::Mat &matFrame) {
         // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
         cv::Mat frontFrame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
         cv::Mat backFrame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
-        frame = sticher.stich(frontFrame, backFrame);
+        frame = sticher.stitch(frontFrame, backFrame);
     }
 }
 void PanoramaRenderer::setPanoImagePath(const char *panoImagePath) {
@@ -88,10 +63,12 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
             cv::flip(img, img, 0);
             frame = img.clone();
 
+            LOGI("frame width: %d,height: %d\n",frame.cols,frame.rows);
+
             // 把frame中位于左右2个半球的鱼眼转换为equirectangular类型全景图
             cv::Mat frontFrame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
             cv::Mat backFrame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
-            frame = sticher.stich(frontFrame, backFrame);
+            frame = sticher.stitch(frontFrame, backFrame);
             //    cv::imwrite(sharePath+"/dst_stich_front.jpg",frontFrame);
             //    cv::imwrite(sharePath+"/dst_stich_back.jpg",backFrame);
             //    cv::imwrite(sharePath+"/dst_stich.jpg",frame);
@@ -113,7 +90,7 @@ void PanoramaRenderer::processDecodedFrameImpl(AVFrame *avFrame) {
 
             cv::Mat frontFrame = frame(cv::Rect(0, 0, frame.cols / 2, frame.rows));
             cv::Mat backFrame = frame(cv::Rect(frame.cols / 2, 0, frame.cols / 2, frame.rows));
-            frame = sticher.stich(frontFrame, backFrame);
+            frame = sticher.stitch(frontFrame, backFrame);
         }
     }
     //    this->setSwitchMode(SwitchMode::PANORAMAVIDEO);
@@ -123,7 +100,7 @@ PanoramaRenderer::PanoramaRenderer() : shaderProgram(0), texture(0), videoTextur
 vboTexCoords(0), vboIndices(0), sphereData(new SphereData(1.0f, 50, 50)), sharePath(""),
 panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f), zoom(1.0f),
 widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::LITTLEPLANET),
-gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
+gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAVIDEO), view(glm::mat4(1.0)), gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4
     //videoCapture.open(mp4File);
@@ -143,8 +120,8 @@ PanoramaRenderer::PanoramaRenderer(const char *shareFolder)
     : shaderProgram(0), texture(0), videoTexture(0), vboVertices(0), vboTexCoords(0), vboIndices(0),
     sphereData(new SphereData(1.0f, 50, 50)), sharePath(shareFolder),
     panoramaImagePath(std::string(sharePath) + "/360panorama.jpg"), rotationX(0.0f), rotationY(0.0f),
-    zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::CRYSTALBALL),
-    gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAIMAGE), view(glm::mat4(1.0)),
+    zoom(1.0f), widthScreen(800), heightScreen(800), ahrs(1.0f / 60.0f), viewOrientation(ViewMode::PERSPECTIVE),
+    gyroOpen(GyroMode::GYRODISABLED), panoMode(SwitchMode::PANORAMAVIDEO), view(glm::mat4(1.0)),
     gyroMat(glm::mat4(1.0)) {
     // Open the input file
     //std::string mp4File = sharePath+"/360panorama.mp4"; // 360panorama.mp4

@@ -201,8 +201,12 @@ if (${ANDROID_ABI} STREQUAL armeabi-v7a)
             ${armeabi_v7a_sources}
             PanoramaRenderer.cpp
             Sphere.cpp
-            dualFisheyeSticher.cpp
+#            dualFisheyeSticher.cpp
     )
+
+    # 链接共享库 dualFisheyeSticher.so
+    set(myStitcherLib ${CMAKE_SOURCE_DIR}/jniLibs/armeabi-v7a/libstitcherFast.so)
+#    target_link_libraries(ijkplayer PRIVATE ${CMAKE_SOURCE_DIR}/jniLibs/armeabi-v7a/libstitcherFast.so)
 else ()
     add_library( # Sets the name of the library.
             ijkplayer
@@ -211,8 +215,11 @@ else ()
             ${arm64_v8a_sources}
             PanoramaRenderer.cpp
             Sphere.cpp
-            dualFisheyeSticher.cpp
+#            dualFisheyeSticher.cpp
     )
+    # 链接共享库 dualFisheyeSticher.so
+    set(myStitcherLib ${CMAKE_SOURCE_DIR}/jniLibs/arm64-v8a/libstitcherFast.so)
+#    target_link_libraries(ijkplayer PRIVATE ${CMAKE_SOURCE_DIR}/jniLibs/arm64-v8a/libstitcherFast.so)
 endif ()
 
 
@@ -246,7 +253,7 @@ set_target_properties(ijksdl-lib
 
 target_link_libraries( # Specifies the target library.
         ijkplayer
-
+        ${myStitcherLib}
         # Links the target library to the log library
         # included in the NDK.
         ijkffmpeg-lib ${log-lib} ${m-lib} ${z-lib} ${android-lib} ${EGL-lib} ${GLES-lib} ${jnigraphics-lib} ${OpenSLES-lib}
@@ -331,7 +338,8 @@ find_library(OpenSLES_LIB OpenSLES)
 # used in the AndroidManifest.xml file.
 add_library(${CMAKE_PROJECT_NAME} SHARED
         # List C/C++ source files with relative paths to this CMakeLists.txt.
-        stb_image.h dualFisheyeSticher.cpp
+        stb_image.h
+#        dualFisheyeSticher.cpp
         PanoramaRenderer.cpp Sphere.cpp)
 
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
@@ -343,6 +351,7 @@ target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC
 # build script, prebuilt third-party libraries, or Android system libraries.
 target_link_libraries(${CMAKE_PROJECT_NAME}
         #${OpenCV_LIBS}
+        ${myStitcherLib}
         EGL
         GLESv3
         # List libraries link to the target library

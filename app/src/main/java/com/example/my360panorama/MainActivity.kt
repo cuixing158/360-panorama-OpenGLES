@@ -110,8 +110,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             ijkMediaPlayer.setOption(IjkMediaPlayer.OPT_CATEGORY_PLAYER, "loglevel", "verbose")
 
 
-            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualfish1920_960.mp4" // Your video file path
-//            ijkMediaPlayer.dataSource = "rtmp://172.17.10.76:1935/live/streamkey"//"rtmp://192.168.2.22/live/test"
+//            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualfish1920_960.mp4" // Your video file path,一般在Device Explorer中包名的"/data/user/0/com.example.my360panorama/files/dualfish1920_960.mp4"
+            ijkMediaPlayer.dataSource = filesDir.absolutePath + "/dualFisheye960_480.mp4" // Your video file path
+//            ijkMediaPlayer.setDataSource("rtsp://192.168.1.254:554/xxx.mov") //"rtmp://192.168.2.22/live/test"
             ijkMediaPlayer.setOnPreparedListener { iMediaPlayer -> iMediaPlayer.start() }
             ijkMediaPlayer.prepareAsync()
 
