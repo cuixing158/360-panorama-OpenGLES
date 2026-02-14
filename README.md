@@ -2,6 +2,8 @@
 
 本项目为Android Studio下工程文件，已实现全景图片，视频的实时拼接和渲染，还支持手动交互，陀螺仪控制视角！
 
+下图从左到右分别表示全景的“小行星”，“透视图”，“水晶球”三种视角表现形式。
+
 ![panoView](./images/mobileshow.jpg)
 
 ---
@@ -34,7 +36,3 @@ libswresample: 2.9.100<br>
 - [OpenCV](https://opencv.org/)
 - [ffmpeg](https://ffmpeg.org/)
 - OpenGL ES 3.0
-
-## 功能
-
-关于与insta360 x3产品功能对标，我们将逐一对标，并列出对标的功能点。更多详细信息请参考[360全景产品对标](./insta360.md)。
