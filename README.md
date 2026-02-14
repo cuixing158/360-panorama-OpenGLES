@@ -1,5 +1,11 @@
 # 360°安卓全景
 
+> [!TIP]
+>
+> 1. 欲体验桌面支持视频剪辑的TOY-APP版本交互操作，请参阅我的MATLAB实现“360° Panorama Studio” [repo](https://github.com/cuixing158/panorama360Studio)。
+> 2. 欲了解其算法底层运作机理，给出了其中部分数学变换原理——请参阅[“360°全景球内外图像顺滑过渡算法”](./doc/mathTransformation.md)文档。
+> 3. C++部分实现请参阅我的[360-Panorama-Viewer-OpenGL](https://github.com/cuixing158/360-Panorama-Viewer-OpenGL) repo.
+
 本项目为Android Studio下工程文件，已实现全景图片，视频的实时拼接和渲染，还支持手动交互，陀螺仪控制视角！
 
 下图从左到右分别表示全景的“小行星”，“透视图”，“水晶球”三种视角表现形式。
